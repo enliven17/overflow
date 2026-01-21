@@ -1,0 +1,56 @@
+{
+  "emulators": {
+    "default": {
+      "port": 3569,
+      "serviceAccount": "emulator-account"
+    }
+  },
+  "contracts": {
+    "FungibleToken": {
+      "source": "",
+      "aliases": {
+        "emulator": "0xee82856bf20e2aa6",
+        "testing": "0x0000000000000002"
+      }
+    },
+    "FlowToken": {
+      "source": "",
+      "aliases": {
+        "emulator": "0x0ae53cb6e3f42a79",
+        "testing": "0x0000000000000003"
+      }
+    },
+    "MockPriceOracle": {
+      "source": "./cadence/contracts/MockPriceOracle.cdc",
+      "aliases": {
+        "testing": "0x0000000000000007"
+      }
+    },
+    "OverflowGame": {
+      "source": "./cadence/contracts/OverflowGame.cdc",
+      "aliases": {
+        "testing": "0x0000000000000007"
+      }
+    }
+  },
+  "networks": {
+    "emulator": "127.0.0.1:3569",
+    "testing": "127.0.0.1:3569",
+    "testnet": "access.devnet.nodes.onflow.org:9000",
+    "mainnet": "access.mainnet.nodes.onflow.org:9000"
+  },
+  "accounts": {
+    "emulator-account": {
+      "address": "f8d6e0586b0a20c7",
+      "key": "ae1b44c0f5e8f6c7e3b4c3e8f6c7e3b4c3e8f6c7e3b4c3e8f6c7e3b4c3e8f6c7"
+    }
+  },
+  "deployments": {
+    "emulator": {
+      "emulator-account": [
+        "MockPriceOracle",
+        "OverflowGame"
+      ]
+    }
+  }
+}

@@ -1,0 +1,126 @@
+/**
+ * Flow script templates for querying blockchain state
+ */
+
+/**
+ * Script to get FLOW token balance for an address
+ * @param address - The Flow address to query
+ * @returns Cadence script code
+ */
+export const getBalanceScript = (address: string) => {
+  return `
+import FlowToken from 0xFlowToken
+import FungibleToken from 0xFungibleToken
+
+access(all) fun main(address: Address): UFix64 {
+  let account = getAccount(address)
+  let vaultRef = account.capabilities.get<&FlowToken.Vault>(/public/flowTokenBalance)
+    .borrow()
+    ?? panic("Could not borrow Balance reference")
+  
+  return vaultRef.balance
+}
+`;
+};
+
+/**
+ * Script to get bet status information
+ * @param betId - The unique bet ID to query
+ * @returns Cadence script code
+ */
+export const getBetStatusScript = (betId: string) => {
+  return `
+import OverflowGame from 0xOverflowGame
+
+access(all) fun main(betId: UInt64): OverflowGame.BetStatusInfo? {
+  return OverflowGame.getBetStatus(betId: betId)
+}
+`;
+};
+
+/**
+ * Script to get all available target cells with multipliers
+ * @returns Cadence script code
+ */
+export const getTargetCellsScript = () => {
+  return `
+import OverflowGame from 0xOverflowGame
+
+access(all) fun main(): [OverflowGame.TargetCellInfo] {
+  return OverflowGame.getTargetCells()
+}
+`;
+};
+
+/**
+ * Script to get active bet for a user
+ * @param address - The player's address
+ * @returns Cadence script code
+ */
+export const getUserActiveBetScript = (address: string) => {
+  return `
+import OverflowGame from 0xOverflowGame
+
+access(all) fun main(player: Address): OverflowGame.BetStatusInfo? {
+  return OverflowGame.getUserActiveBet(player: player)
+}
+`;
+};
+
+/**
+ * Script to check if game is paused
+ * @returns Cadence script code
+ */
+export const isGamePausedScript = () => {
+  return `
+import OverflowGame from 0xOverflowGame
+
+access(all) fun main(): Bool {
+  return OverflowGame.isGamePaused()
+}
+`;
+};
+
+/**
+ * Script to get treasury balance
+ * @returns Cadence script code
+ */
+export const getTreasuryBalanceScript = () => {
+  return `
+import OverflowGame from 0xOverflowGame
+
+access(all) fun main(): UFix64 {
+  return OverflowGame.getTreasuryBalance()
+}
+`;
+};
+
+/**
+ * Script to get pending payout for a bet
+ * @param betId - The unique bet ID to query
+ * @returns Cadence script code
+ */
+export const getPendingPayoutScript = (betId: string) => {
+  return `
+import OverflowGame from 0xOverflowGame
+
+access(all) fun main(betId: UInt64): UFix64? {
+  return OverflowGame.getPendingPayout(betId: betId)
+}
+`;
+};
+
+/**
+ * Script to get current BTC price from oracle
+ * @returns Cadence script code
+ */
+export const getCurrentPriceScript = () => {
+  return `
+import MockPriceOracle from 0xMockPriceOracle
+
+access(all) fun main(): UFix64 {
+  let priceData = MockPriceOracle.getFreshPrice()
+  return priceData.price
+}
+`;
+};
