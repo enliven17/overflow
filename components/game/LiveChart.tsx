@@ -236,25 +236,55 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
       {/* Cells Layer - Rendered BEHIND the chart line */}
       <div className="absolute inset-0 z-5 overflow-hidden pointer-events-none">
         {betCells.map((cell: any) => {
-          // Visual styling based on status - using purple gradient
+          // Visual styling based on status
           let opacity = 0.9;
           let bg = cell.color;
           let borderStyle = `1px solid ${cell.borderColor}`;
-          let transform = 'scale(1)';
-          let boxShadow = 'none';
           let canBet = cell.status === 'future';
+          let extraClass = '';
 
           if (cell.status === 'won') {
-            opacity = 1;
-            bg = '#00F0FF'; // Neon cyan for won
-            borderStyle = `2px solid #ffffff`;
-            transform = 'scale(1.05)';
-            boxShadow = `0 0 25px #00F0FF, 0 0 50px #00F0FF50`;
+            // Won cell - purple with explosion ring effect (higher opacity)
+            return (
+              <div key={cell.id} className="pointer-events-none">
+                {/* Explosion ring expanding outward */}
+                <div
+                  className="absolute rounded-sm animate-ping"
+                  style={{
+                    left: cell.x - 5,
+                    top: cell.y - 5,
+                    width: cell.width + 10,
+                    height: cell.height + 10,
+                    backgroundColor: '#a855f7',
+                    opacity: 0.5
+                  }}
+                />
+                {/* Main cell with content - purple, higher opacity */}
+                <div
+                  className="absolute rounded-sm flex items-center justify-center"
+                  style={{
+                    left: cell.x,
+                    top: cell.y,
+                    width: cell.width,
+                    height: cell.height,
+                    backgroundColor: 'rgba(168, 85, 247, 0.9)',
+                    border: '2px solid #ffffff',
+                    boxShadow: '0 0 20px #a855f7'
+                  }}
+                >
+                  <span className="text-[10px] font-mono font-bold text-white">
+                    x{cell.multiplier}
+                  </span>
+                </div>
+              </div>
+            );
           } else if (cell.status === 'lost') {
             return null;
           } else if (cell.status === 'active') {
-            opacity = 0.95;
-            borderStyle = `2px solid ${cell.borderColor}`;
+            // Active cells - subtle glow, keep same color
+            opacity = 1;
+            borderStyle = `2px solid rgba(255,255,255,0.5)`;
+            extraClass = 'ring-1 ring-white/30';
           }
 
           const handleClick = () => {
@@ -267,7 +297,7 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
             <div
               key={cell.id}
               onClick={handleClick}
-              className={`absolute rounded-sm flex items-center justify-center ${canBet ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none'}`}
+              className={`absolute rounded-sm flex items-center justify-center ${canBet ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none'} ${extraClass}`}
               style={{
                 left: cell.x,
                 top: cell.y,
