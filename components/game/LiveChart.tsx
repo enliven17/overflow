@@ -77,8 +77,8 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
     // Use FIRST price in history as stable reference
     const referencePrice = priceHistory.length > 0 ? priceHistory[0].price : currentPrice;
 
-    // Use ±10% of reference price for Y-axis range (larger to keep chart visible)
-    const rangePercent = 0.10; // 10%
+    // Use ±6% of reference price for Y-axis range
+    const rangePercent = 0.06; // 6%
     const targetMin = referencePrice * (1 - rangePercent);
     const targetMax = referencePrice * (1 + rangePercent);
 
