@@ -11,10 +11,10 @@ import { RoundTimer } from './RoundTimer';
 export const GameBoard: React.FC = () => {
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [betAmount, setBetAmount] = useState<string>('');
-  
+
   const placeBet = useStore((state) => state.placeBet);
   const activeRound = useStore((state) => state.activeRound);
-  
+
   const handlePlaceBet = async () => {
     if (selectedTarget && betAmount) {
       try {
@@ -27,41 +27,50 @@ export const GameBoard: React.FC = () => {
       }
     }
   };
-  
+
   return (
-    <div className="min-h-screen bg-[#0a0a0a] p-4">
-      <div className="max-w-7xl mx-auto space-y-4">
-        {/* Main Game Area - Split Screen */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Left Side - Chart */}
-          <div className="space-y-4">
-            <LiveChart />
-            
-            {/* Active Round Display (below chart on left side) */}
-            {activeRound && (
-              <div className="space-y-4">
-                <RoundTimer />
-                <ActiveRound />
-              </div>
-            )}
-          </div>
-          
-          {/* Right Side - Betting Interface */}
-          <div className="space-y-4">
-            <BetControls
-              selectedTarget={selectedTarget}
-              betAmount={betAmount}
-              onBetAmountChange={setBetAmount}
-              onPlaceBet={handlePlaceBet}
-            />
-            
-            <TargetGrid
-              selectedTarget={selectedTarget}
-              onSelectTarget={setSelectedTarget}
-              betAmount={betAmount}
-            />
+    <div className="relative w-full h-full flex overflow-hidden">
+      {/* Background Chart - Z-0 */}
+      <div className="absolute inset-0 z-0">
+        <LiveChart />
+      </div>
+
+      {/* Active Round Overlay - Centered or Top */}
+      {activeRound && (
+        <div className="absolute top-32 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+          <div className="pointer-events-auto scale-125">
+            <RoundTimer />
           </div>
         </div>
+      )}
+
+      {/* Right Sidebar - Grid Bet Panel - Z-30 */}
+      <div className="absolute right-6 top-24 bottom-6 w-[380px] z-30 flex flex-col gap-4">
+
+        {/* Bet Amount Control - Compact Top Bar */}
+        <div className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-xl p-4 shadow-2xl">
+          <BetControls
+            selectedTarget={selectedTarget}
+            betAmount={betAmount}
+            onBetAmountChange={setBetAmount}
+            onPlaceBet={handlePlaceBet}
+          />
+        </div>
+
+        {/* Target Grid - Main Area */}
+        <div className="flex-1 bg-black/80 backdrop-blur-xl border border-white/10 rounded-xl p-4 shadow-2xl overflow-y-auto">
+          <TargetGrid
+            selectedTarget={selectedTarget}
+            onSelectTarget={setSelectedTarget}
+            betAmount={betAmount}
+          />
+        </div>
+
+        {activeRound && (
+          <div className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-xl p-4 shadow-2xl">
+            <ActiveRound />
+          </div>
+        )}
       </div>
     </div>
   );

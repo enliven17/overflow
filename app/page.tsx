@@ -8,47 +8,26 @@ import { NetworkSelector } from '@/components/NetworkSelector';
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-[#0a0a0a]">
-      {/* Header */}
-      <header className="border-b border-gray-800 bg-black/50 backdrop-blur-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
-            {/* Logo */}
-            <div>
-              <h1 className="text-3xl font-bold text-[#FF006E]">OVERFLOW</h1>
-              <p className="text-gray-400 text-xs">BTC Price Prediction Game</p>
-            </div>
-            
-            {/* Wallet Section */}
-            <div className="flex items-center gap-4">
-              <NetworkSelector />
-              <WalletInfo />
-              <WalletConnect />
-            </div>
-          </div>
+    <div className="h-screen w-screen bg-[#02040A] overflow-hidden flex flex-col relative">
+      {/* Header - Floating minimal */}
+      <header className="absolute top-0 left-0 right-0 z-50 px-6 py-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
+        <div className="pointer-events-auto">
+          <h1 className="text-2xl font-bold text-white tracking-wider flex items-center gap-2">
+            OVERFLOW <span className="text-neon-blue text-xs font-normal border border-neon-blue px-2 py-0.5 rounded">BETA</span>
+          </h1>
+        </div>
+
+        <div className="pointer-events-auto flex items-center gap-4">
+          <NetworkSelector />
+          <WalletInfo />
+          <WalletConnect />
         </div>
       </header>
-      
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        <div className="space-y-6">
-          {/* Game Board */}
-          <GameBoard />
-          
-          {/* Bet History */}
-          <BetHistory />
-        </div>
+
+      {/* Main Content - Full Screen */}
+      <main className="flex-1 w-full h-full relative">
+        <GameBoard />
       </main>
-      
-      {/* Footer */}
-      <footer className="border-t border-gray-800 mt-12">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="text-center text-gray-500 text-sm">
-            <p>Overflow - Decentralized BTC Price Prediction Game on Flow Blockchain</p>
-            <p className="mt-2 text-xs">⚠️ For entertainment purposes only. Bet responsibly.</p>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
