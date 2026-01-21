@@ -46,15 +46,15 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
 
-  // Smooth Animation Loop
+  // Animation Loop - Optimized for performance
   useEffect(() => {
     let frameId: number;
     let lastTime = Date.now();
 
     const animate = () => {
       const currentTime = Date.now();
-      // Throttle to ~30fps for smoother visual (less re-renders)
-      if (currentTime - lastTime > 33) {
+      // Throttle to ~20fps for better performance
+      if (currentTime - lastTime > 50) {
         setNow(currentTime);
         lastTime = currentTime;
       }
@@ -64,11 +64,11 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
     return () => cancelAnimationFrame(frameId);
   }, []);
 
-  // Configuration
-  const historyWidthRatio = 0.50; // Chart tip at 50%
-  const pixelsPerSecond = 50; // Speed
-  const gridInterval = 2000; // 2s per column (smaller for square cells)
-  const numRows = 12; // More rows
+  // Configuration - Optimized
+  const historyWidthRatio = 0.50;
+  const pixelsPerSecond = 50;
+  const gridInterval = 2500; // Larger interval = fewer cells
+  const numRows = 10; // Reduced for performance
 
   // Scales
   const scales = useMemo(() => {
@@ -263,11 +263,10 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
           };
 
           return (
-            <button
+            <div
               key={cell.id}
               onClick={handleClick}
-              disabled={!canBet}
-              className={`absolute rounded-sm flex flex-col items-center justify-center transition-all duration-150 ${canBet ? 'pointer-events-auto cursor-pointer hover:scale-105 hover:brightness-125' : 'pointer-events-none'}`}
+              className={`absolute rounded-sm flex items-center justify-center ${canBet ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none'}`}
               style={{
                 left: cell.x,
                 top: cell.y,
@@ -275,16 +274,13 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
                 height: cell.height,
                 backgroundColor: bg,
                 border: borderStyle,
-                opacity,
-                transform,
-                boxShadow,
-                zIndex: cell.status === 'won' ? 100 : 1
+                opacity
               }}
             >
-              <span className={`text-[10px] font-mono font-bold ${cell.status === 'won' ? 'text-black' : 'text-white'} drop-shadow-sm`}>
+              <span className="text-[10px] font-mono font-bold text-white/80">
                 x{cell.multiplier}
               </span>
-            </button>
+            </div>
           );
         })}
       </div>
@@ -297,30 +293,28 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
             <path
               d={chartPath}
               fill="none"
-              stroke="#00F0FF"
-              strokeWidth="15"
-              strokeOpacity="0.15"
+              stroke="#00FF9D"
+              strokeWidth="12"
+              strokeOpacity="0.2"
               strokeLinecap="round"
             />
             {/* Main line */}
             <path
               d={chartPath}
               fill="none"
-              stroke="#00F0FF"
+              stroke="#00FF9D"
               strokeWidth="3"
               strokeLinecap="round"
-              className="drop-shadow-[0_0_10px_rgba(0,240,255,0.8)]"
             />
 
             {/* Tip indicator */}
             <circle
               cx={scales.tipX}
               cy={scales.yScale(currentPrice)}
-              r="6"
-              fill="#ffffff"
-              stroke="#00F0FF"
+              r="5"
+              fill="#00FF9D"
+              stroke="#ffffff"
               strokeWidth="2"
-              className="animate-pulse"
             />
 
             {/* Horizontal price line */}
