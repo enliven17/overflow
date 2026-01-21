@@ -65,29 +65,28 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
   }, []);
 
   // Configuration
-  const historyWidthRatio = 0.55; // Chart tip at 55% - more room for future grid
-  const pixelsPerSecond = 60; // Speed
-  const gridInterval = 2500; // 2.5s per column
-  const numRows = 8;
+  const historyWidthRatio = 0.50; // Chart tip at 50%
+  const pixelsPerSecond = 50; // Speed
+  const gridInterval = 2000; // 2s per column (smaller for square cells)
+  const numRows = 12; // More rows
 
   // Scales
   const scales = useMemo(() => {
     if (dimensions.width === 0 || currentPrice === 0) return null;
 
-    // Use ±1% of current price for Y-axis range
-    const rangePercent = 0.01; // 1%
-    const targetMin = currentPrice * (1 - rangePercent);
-    const targetMax = currentPrice * (1 + rangePercent);
+    // Use FIRST price in history as stable reference
+    const referencePrice = priceHistory.length > 0 ? priceHistory[0].price : currentPrice;
 
-    const lerp = (start: number, end: number, factor: number) => start + (end - start) * factor;
+    // Use ±10% of reference price for Y-axis range (larger to keep chart visible)
+    const rangePercent = 0.10; // 10%
+    const targetMin = referencePrice * (1 - rangePercent);
+    const targetMax = referencePrice * (1 + rangePercent);
 
+    // FIXED Y-axis - only initialize once
     if (!yDomain.current.initialized) {
       yDomain.current = { min: targetMin, max: targetMax, initialized: true };
-    } else {
-      // Smooth transition to new range
-      yDomain.current.min = lerp(yDomain.current.min, targetMin, 0.02);
-      yDomain.current.max = lerp(yDomain.current.max, targetMax, 0.02);
     }
+    // No lerp/update - axis stays fixed
 
     const { min: minY, max: maxY } = yDomain.current;
 
@@ -130,16 +129,14 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
   }, [scales, priceHistory, currentPrice, now]);
 
   // Continuous Grid Generation
-  // Key: Use modulo arithmetic for infinite scroll effect
+  // Cells are now positioned based on PRICE LEVELS, not fixed pixels
   const betCells = useMemo(() => {
     if (!scales || dimensions.height === 0) return [];
 
     const cells = [];
     const colWidth = (gridInterval / 1000) * pixelsPerSecond;
-    const rowHeight = dimensions.height / numRows;
 
     // Calculate base offset for smooth scrolling
-    // This creates a continuous "conveyor belt" effect
     const baseOffset = (now % gridInterval) / 1000 * pixelsPerSecond;
 
     // Generate enough columns to fill screen + buffer
@@ -148,58 +145,75 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
 
     const currentPriceY = scales.yScale(currentPrice);
 
+    // Calculate price range for each row
+    const priceRange = scales.maxY - scales.minY;
+    const pricePerRow = priceRange / numRows;
+
     for (let col = -1; col < columnsNeeded; col++) {
-      // Column X position: starts at tipX, flows right-to-left
       const colX = scales.tipX + (col * colWidth) - baseOffset + colWidth;
 
-      // Calculate the "virtual time" this column represents
       const colTimeOffset = col * gridInterval;
       const colTimestamp = Math.floor(now / gridInterval) * gridInterval + colTimeOffset + gridInterval;
 
-      // Skip if completely off-screen left
       if (colX + colWidth < scales.tipX - 50) continue;
-      // Skip if too far right
       if (colX > dimensions.width + 50) continue;
 
-      // Determine if this column is crossing the tip
       const isCrossing = colX <= scales.tipX && colX + colWidth > scales.tipX;
       const isPast = colX + colWidth <= scales.tipX;
 
       for (let row = 0; row < numRows; row++) {
-        const y = row * rowHeight;
-        const cellBottom = y + rowHeight;
+        // Calculate price levels for this row (top = high price, bottom = low price)
+        const rowPriceTop = scales.maxY - (row * pricePerRow);
+        const rowPriceBottom = scales.maxY - ((row + 1) * pricePerRow);
+        const rowPriceCenter = (rowPriceTop + rowPriceBottom) / 2;
+
+        // Convert price to Y position using the scale
+        const y = scales.yScale(rowPriceTop);
+        const cellBottom = scales.yScale(rowPriceBottom);
+        const rowHeight = cellBottom - y;
         const centerY = y + rowHeight / 2;
 
         // Determine win/loss for cells crossing or past
         let status: 'future' | 'active' | 'won' | 'lost' = 'future';
 
         if (isCrossing || isPast) {
-          // Check if price is in this row
-          if (currentPriceY >= y && currentPriceY <= cellBottom) {
+          // Check if current price is in this row's price range
+          if (currentPrice <= rowPriceTop && currentPrice >= rowPriceBottom) {
             status = 'won';
           } else {
             status = isPast ? 'lost' : 'active';
           }
         }
 
-        // Color based on position relative to center
-        const isUp = centerY < dimensions.height / 2;
+        // Color based on position relative to current price
+        const isUp = rowPriceCenter > currentPrice;
 
-        // Multiplier calculation (reduced values)
-        const distFromCenter = Math.abs(centerY - dimensions.height / 2) / dimensions.height;
+        // Multiplier calculation based on price distance
+        const priceDist = Math.abs(rowPriceCenter - currentPrice) / priceRange;
         const timeBonus = Math.max(0, (colX - scales.tipX) / 200) * 0.2;
-        const multiplier = (1.1 + distFromCenter * 2 + timeBonus).toFixed(2);
+        const multiplier = (1.1 + priceDist * 3 + timeBonus).toFixed(2);
+
+        // Purple gradient color based on distance from current price
+        // Close to price = higher opacity, far from price = lower opacity
+        const intensity = Math.min(priceDist * 2, 1); // 0 to 1
+        const hue = 270; // Purple hue
+        const saturation = 50 + intensity * 30; // 50-80%
+        const lightness = 45; // Fixed lightness
+        const alpha = 0.4 - intensity * 0.3; // 0.4-0.1 (reduced opacity)
+        const cellColor = `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`;
+        const borderColor = `hsla(${hue}, 70%, 55%, ${0.5 - intensity * 0.3})`;
 
         cells.push({
           id: `cell-${colTimestamp}-${row}`,
           x: colX,
           y,
           width: colWidth - 3,
-          height: rowHeight - 3,
+          height: Math.max(rowHeight - 3, 10),
           multiplier,
           isUp,
           status,
-          color: isUp ? '#00ff9d' : '#ff006e'
+          color: cellColor,
+          borderColor: borderColor
         });
       }
     }
@@ -221,26 +235,25 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
       {/* Cells Layer - Rendered BEHIND the chart line */}
       <div className="absolute inset-0 z-5 overflow-hidden pointer-events-none">
         {betCells.map((cell: any) => {
-          // Visual styling based on status
-          let opacity = 0.7;
-          let bg = `${cell.color}15`;
-          let borderStyle = `1px solid ${cell.color}40`;
+          // Visual styling based on status - using purple gradient
+          let opacity = 0.9;
+          let bg = cell.color;
+          let borderStyle = `1px solid ${cell.borderColor}`;
           let transform = 'scale(1)';
           let boxShadow = 'none';
-          let canBet = cell.status === 'future'; // Only future cells can be bet on
+          let canBet = cell.status === 'future';
 
           if (cell.status === 'won') {
             opacity = 1;
-            bg = cell.color;
+            bg = '#00F0FF'; // Neon cyan for won
             borderStyle = `2px solid #ffffff`;
             transform = 'scale(1.05)';
-            boxShadow = `0 0 25px ${cell.color}, 0 0 50px ${cell.color}50`;
+            boxShadow = `0 0 25px #00F0FF, 0 0 50px #00F0FF50`;
           } else if (cell.status === 'lost') {
-            // Don't render lost cells
             return null;
           } else if (cell.status === 'active') {
-            opacity = 0.9;
-            borderStyle = `1px solid ${cell.color}80`;
+            opacity = 0.95;
+            borderStyle = `2px solid ${cell.borderColor}`;
           }
 
           const handleClick = () => {
