@@ -69,7 +69,7 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
   const historyWidthRatio = isMobile ? 0.35 : 0.50; // More grid space on mobile
   const pixelsPerSecond = isMobile ? 40 : 50;
   const gridInterval = isMobile ? 3000 : 2500; // Fewer cells on mobile
-  const numRows = isMobile ? 8 : 10;
+  const numRows = 10; // Same on mobile and desktop
 
   // Scales
   const scales = useMemo(() => {
