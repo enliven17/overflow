@@ -64,11 +64,12 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
     return () => cancelAnimationFrame(frameId);
   }, []);
 
-  // Configuration - Optimized
-  const historyWidthRatio = 0.50;
-  const pixelsPerSecond = 50;
-  const gridInterval = 2500; // Larger interval = fewer cells
-  const numRows = 10; // Reduced for performance
+  // Configuration - Responsive
+  const isMobile = dimensions.width < 640;
+  const historyWidthRatio = isMobile ? 0.35 : 0.50; // More grid space on mobile
+  const pixelsPerSecond = isMobile ? 40 : 50;
+  const gridInterval = isMobile ? 3000 : 2500; // Fewer cells on mobile
+  const numRows = isMobile ? 8 : 10;
 
   // Scales
   const scales = useMemo(() => {
@@ -331,10 +332,10 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
         )}
       </svg>
 
-      {/* Price Header - positioned below the main header */}
-      <div className="absolute top-20 left-6 z-30 pointer-events-none">
-        <h2 className="text-gray-500 text-xs tracking-widest font-mono mb-1">BTC/USD</h2>
-        <p className="text-white text-4xl font-black font-mono tracking-tight drop-shadow-2xl">
+      {/* Price Header - Mobile Responsive */}
+      <div className="absolute top-12 sm:top-20 left-3 sm:left-6 z-30 pointer-events-none">
+        <h2 className="text-gray-500 text-[10px] sm:text-xs tracking-widest font-mono mb-0.5 sm:mb-1">BTC/USD</h2>
+        <p className="text-white text-2xl sm:text-4xl font-black font-mono tracking-tight">
           ${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
       </div>
