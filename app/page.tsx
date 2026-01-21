@@ -12,14 +12,21 @@ export default function Home() {
       {/* Header - Floating minimal */}
       <header className="absolute top-0 left-0 right-0 z-50 px-6 py-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
         <div className="pointer-events-auto">
-          <h1 className="text-2xl font-bold text-white tracking-wider flex items-center gap-2">
-            OVERFLOW <span className="text-neon-blue text-xs font-normal border border-neon-blue px-2 py-0.5 rounded">BETA</span>
+          <h1 className="flex items-center gap-3">
+            <span
+              className="text-3xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-white via-neon-blue to-white"
+              style={{ fontFamily: 'var(--font-orbitron)' }}
+            >
+              OVERFLOW
+            </span>
+            <span className="text-neon-blue text-[10px] font-mono font-normal border border-neon-blue/50 px-2 py-0.5 rounded bg-neon-blue/10">
+              BETA
+            </span>
           </h1>
         </div>
 
         <div className="pointer-events-auto flex items-center gap-4">
           <NetworkSelector />
-          <WalletInfo />
           <WalletConnect />
         </div>
       </header>

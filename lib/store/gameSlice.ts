@@ -17,7 +17,7 @@ export interface GameState {
   isPlacingBet: boolean;
   isSettling: boolean;
   error: string | null;
-  
+
   // Actions
   placeBet: (amount: string, targetId: string) => Promise<void>;
   settleRound: (betId: string) => Promise<void>;
@@ -55,42 +55,62 @@ export const createGameSlice: StateCreator<GameState> = (set, get) => ({
   isPlacingBet: false,
   isSettling: false,
   error: null,
-  
+
   /**
    * Place a bet on a target cell
    * Initiates transaction to deposit FLOW tokens and create bet on-chain
    * @param amount - Bet amount in FLOW tokens (e.g., "1.0")
-   * @param targetId - ID of the target cell (1-8)
+   * @param targetId - ID of the target cell (1-8) OR dynamic grid target (e.g., "UP-2.50")
    */
   placeBet: async (amount: string, targetId: string) => {
     const { targetCells, activeRound, currentPrice } = get();
-    
+
     try {
       // Validate no active round
       if (activeRound) {
         throw new Error("Cannot place bet while a round is active");
       }
-      
-      // Find target cell
-      const target = targetCells.find(cell => cell.id === targetId);
-      if (!target) {
-        throw new Error("Invalid target cell");
-      }
-      
+
       // Validate amount
       const betAmount = parseFloat(amount);
       if (isNaN(betAmount) || betAmount <= 0) {
         throw new Error("Invalid bet amount");
       }
-      
+
+      let target: TargetCell;
+
+      // Check if this is a dynamic grid target (e.g., "UP-2.50" or "DOWN-1.80")
+      if (targetId.startsWith('UP-') || targetId.startsWith('DOWN-')) {
+        const parts = targetId.split('-');
+        const direction = parts[0] as 'UP' | 'DOWN';
+        const multiplier = parseFloat(parts[1]) || 1.5;
+
+        // Create dynamic target
+        target = {
+          id: targetId,
+          label: `${direction} x${multiplier}`,
+          multiplier: multiplier,
+          priceChange: direction === 'UP' ? 10 : -10, // Placeholder
+          direction: direction
+        };
+      } else {
+        // Find predefined target cell
+        const foundTarget = targetCells.find(cell => cell.id === targetId);
+        if (!foundTarget) {
+          throw new Error("Invalid target cell");
+        }
+        target = foundTarget;
+      }
+
       set({ isPlacingBet: true, error: null });
-      
+
       // Prepare transaction arguments
-      const targetCellId = target.id;
+      // For dynamic targets, use '9' as a special indicator
+      const targetCellId = targetId.startsWith('UP-') || targetId.startsWith('DOWN-') ? '9' : target.id;
       const priceChange = target.priceChange.toString();
       const direction = target.direction === 'UP' ? '0' : '1';
       const multiplier = target.multiplier.toString();
-      
+
       // Execute transaction
       const transactionId = await fcl.mutate({
         cadence: placeBetTransaction(amount, targetCellId, multiplier),
@@ -103,24 +123,24 @@ export const createGameSlice: StateCreator<GameState> = (set, get) => ({
         ],
         limit: 9999
       });
-      
+
       // Wait for transaction to be sealed
       const transaction = await fcl.tx(transactionId).onceSealed();
-      
+
       if (transaction.statusCode !== 0) {
         throw new Error(transaction.errorMessage || "Transaction failed");
       }
-      
+
       // Extract bet ID from events
-      const betPlacedEvent = transaction.events.find((e: any) => 
+      const betPlacedEvent = transaction.events.find((e: any) =>
         e.type.includes('OverflowGame.BetPlaced')
       );
-      
+
       if (betPlacedEvent) {
         const betId = betPlacedEvent.data.betId;
         const startTime = parseFloat(betPlacedEvent.data.startTime);
         const endTime = parseFloat(betPlacedEvent.data.endTime);
-        
+
         // Create active round
         const newRound: ActiveRound = {
           betId: betId.toString(),
@@ -131,7 +151,7 @@ export const createGameSlice: StateCreator<GameState> = (set, get) => ({
           endTime: endTime * 1000, // Convert to milliseconds
           status: 'active'
         };
-        
+
         set({
           activeRound: newRound,
           isPlacingBet: false,
@@ -149,7 +169,7 @@ export const createGameSlice: StateCreator<GameState> = (set, get) => ({
       throw error;
     }
   },
-  
+
   /**
    * Settle an active round
    * Initiates transaction to determine win/loss and process payout
@@ -158,7 +178,7 @@ export const createGameSlice: StateCreator<GameState> = (set, get) => ({
   settleRound: async (betId: string) => {
     try {
       set({ isSettling: true, error: null });
-      
+
       // Execute settlement transaction
       const transactionId = await fcl.mutate({
         cadence: settleRoundTransaction(betId),
@@ -167,14 +187,14 @@ export const createGameSlice: StateCreator<GameState> = (set, get) => ({
         ],
         limit: 9999
       });
-      
+
       // Wait for transaction to be sealed
       const transaction = await fcl.tx(transactionId).onceSealed();
-      
+
       if (transaction.statusCode !== 0) {
         throw new Error(transaction.errorMessage || "Settlement failed");
       }
-      
+
       // Update active round status
       const { activeRound } = get();
       if (activeRound && activeRound.betId === betId) {
@@ -186,7 +206,7 @@ export const createGameSlice: StateCreator<GameState> = (set, get) => ({
           isSettling: false,
           error: null
         });
-        
+
         // Clear active round after a delay to show result
         setTimeout(() => {
           set({ activeRound: null });
@@ -203,7 +223,7 @@ export const createGameSlice: StateCreator<GameState> = (set, get) => ({
       throw error;
     }
   },
-  
+
   /**
    * Update current price and add to history
    * Maintains rolling 5-minute window of price data
@@ -212,31 +232,31 @@ export const createGameSlice: StateCreator<GameState> = (set, get) => ({
   updatePrice: (price: number) => {
     const { priceHistory } = get();
     const now = Date.now();
-    
+
     // Create new price point
     const newPoint: PricePoint = {
       timestamp: now,
       price
     };
-    
+
     // Add to history
     const updatedHistory = [...priceHistory, newPoint];
-    
+
     // Maintain rolling 5-minute window
     const fiveMinutesAgo = now - (5 * 60 * 1000);
     const filteredHistory = updatedHistory.filter(
       point => point.timestamp >= fiveMinutesAgo
     );
-    
+
     // Limit to MAX_PRICE_HISTORY points
     const trimmedHistory = filteredHistory.slice(-MAX_PRICE_HISTORY);
-    
+
     set({
       currentPrice: price,
       priceHistory: trimmedHistory
     });
   },
-  
+
   /**
    * Set active round (used by event listeners)
    * @param round - Active round data or null to clear
@@ -244,7 +264,7 @@ export const createGameSlice: StateCreator<GameState> = (set, get) => ({
   setActiveRound: (round: ActiveRound | null) => {
     set({ activeRound: round });
   },
-  
+
   /**
    * Load target cells from blockchain
    * Falls back to default configuration if query fails
@@ -261,7 +281,7 @@ export const createGameSlice: StateCreator<GameState> = (set, get) => ({
           }
         `
       });
-      
+
       // Transform to frontend format
       const targetCells: TargetCell[] = cells.map((cell: any) => ({
         id: cell.id.toString(),
@@ -270,7 +290,7 @@ export const createGameSlice: StateCreator<GameState> = (set, get) => ({
         priceChange: parseFloat(cell.priceChange),
         direction: cell.direction === 0 ? 'UP' : 'DOWN'
       }));
-      
+
       set({ targetCells });
     } catch (error) {
       console.error("Error loading target cells:", error);
@@ -278,7 +298,7 @@ export const createGameSlice: StateCreator<GameState> = (set, get) => ({
       set({ targetCells: DEFAULT_TARGET_CELLS });
     }
   },
-  
+
   /**
    * Clear error message
    */
@@ -297,7 +317,7 @@ export const startPriceFeed = (
   updatePrice: (price: number) => void
 ): (() => void) => {
   let intervalId: NodeJS.Timeout;
-  
+
   const fetchPrice = async () => {
     try {
       const price = await fcl.query({
@@ -310,19 +330,19 @@ export const startPriceFeed = (
           }
         `
       });
-      
+
       updatePrice(parseFloat(price));
     } catch (error) {
       console.error("Error fetching price:", error);
     }
   };
-  
+
   // Fetch initial price
   fetchPrice();
-  
+
   // Poll every second
   intervalId = setInterval(fetchPrice, 1000);
-  
+
   // Return cleanup function
   return () => {
     if (intervalId) {

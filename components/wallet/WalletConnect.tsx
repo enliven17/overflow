@@ -8,27 +8,23 @@ export const WalletConnect: React.FC = () => {
   const isConnected = useStore((state) => state.isConnected);
   const isConnecting = useStore((state) => state.isConnecting);
   const connect = useStore((state) => state.connect);
-  const disconnect = useStore((state) => state.disconnect);
   const error = useStore((state) => state.error);
-  
-  const handleClick = () => {
-    if (isConnected) {
-      disconnect();
-    } else {
-      connect();
-    }
-  };
-  
+
+  // Don't show anything when connected (disconnect is in bottom panel now)
+  if (isConnected) {
+    return null;
+  }
+
   return (
     <div className="flex flex-col items-end gap-2">
       <Button
-        onClick={handleClick}
+        onClick={connect}
         disabled={isConnecting}
-        variant={isConnected ? 'secondary' : 'primary'}
+        variant="primary"
       >
-        {isConnecting ? 'Connecting...' : isConnected ? 'Disconnect' : 'Connect Wallet'}
+        {isConnecting ? 'Connecting...' : 'Connect Wallet'}
       </Button>
-      
+
       {error && (
         <p className="text-red-500 text-sm">{error}</p>
       )}
