@@ -5,7 +5,6 @@ import { useOverflowStore } from '@/lib/store';
 import { configureFlow } from '@/lib/flow/config';
 import { restoreWalletSession } from '@/lib/store/walletSlice';
 import { startPriceFeed } from '@/lib/store/gameSlice';
-import { startMockPriceFeed } from '@/lib/utils/mockPriceFeed';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const initialized = useRef(false);
@@ -20,7 +19,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
       try {
         // Configure Flow for emulator (change to 'testnet' or 'mainnet' as needed)
         const network = (process.env.NEXT_PUBLIC_FLOW_NETWORK as 'emulator' | 'testnet' | 'mainnet') || 'emulator';
-        const useMockFeed = process.env.NEXT_PUBLIC_USE_MOCK_FEED !== 'false';
         
         configureFlow(network);
         
@@ -33,22 +31,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         // Load target cells
         await loadTargetCells().catch(console.error);
         
-        // Start price feed (mock or real)
-        let stopPriceFeed: () => void;
-        
-        if (useMockFeed) {
-          // Use mock price feed for development/testing
-          console.log('Using mock price feed');
-          stopPriceFeed = startMockPriceFeed(updatePrice, {
-            basePrice: 50000,
-            volatility: 0.001,
-            trend: 0
-          });
-        } else {
-          // Use real oracle price feed
-          console.log('Using oracle price feed');
-          stopPriceFeed = startPriceFeed(updatePrice);
-        }
+        // Start Pyth Network price feed
+        console.log('Starting Pyth Network price feed for real-time BTC/USD prices');
+        const stopPriceFeed = startPriceFeed(updatePrice);
         
         // Mark as ready
         setIsReady(true);

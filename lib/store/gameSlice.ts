@@ -309,44 +309,42 @@ export const createGameSlice: StateCreator<GameState> = (set, get) => ({
 
 /**
  * Start price feed polling
- * Fetches current BTC price from oracle every second
+ * Fetches real-time BTC price from Pyth Network every second
  * @param updatePrice - Function to update price in store
  * @returns Function to stop polling
  */
 export const startPriceFeed = (
   updatePrice: (price: number) => void
 ): (() => void) => {
-  let intervalId: NodeJS.Timeout;
-
-  const fetchPrice = async () => {
-    try {
-      const price = await fcl.query({
-        cadence: `
-          import MockPriceOracle from 0xMockPriceOracle
-          
-          access(all) fun main(): UFix64 {
-            let priceData = MockPriceOracle.getFreshPrice()
-            return priceData.price
-          }
-        `
+  // Import Pyth price feed dynamically to avoid SSR issues
+  import('@/lib/utils/priceFeed').then(({ startPythPriceFeed }) => {
+    const stopFeed = startPythPriceFeed((price, data) => {
+      updatePrice(price);
+      
+      // Log price updates with confidence interval
+      console.log(`BTC Price: $${price.toFixed(2)} ±$${data.confidence.toFixed(2)}`);
+    });
+    
+    // Store cleanup function
+    (window as any).__stopPriceFeed = stopFeed;
+  }).catch(error => {
+    console.error('Failed to start Pyth price feed:', error);
+    
+    // Fallback to mock price feed for development
+    import('@/lib/utils/priceFeed').then(({ startMockPriceFeed }) => {
+      const stopFeed = startMockPriceFeed((price) => {
+        updatePrice(price);
       });
-
-      updatePrice(parseFloat(price));
-    } catch (error) {
-      console.error("Error fetching price:", error);
-    }
-  };
-
-  // Fetch initial price
-  fetchPrice();
-
-  // Poll every second
-  intervalId = setInterval(fetchPrice, 1000);
+      
+      (window as any).__stopPriceFeed = stopFeed;
+    });
+  });
 
   // Return cleanup function
   return () => {
-    if (intervalId) {
-      clearInterval(intervalId);
+    if ((window as any).__stopPriceFeed) {
+      (window as any).__stopPriceFeed();
+      delete (window as any).__stopPriceFeed;
     }
   };
 };
