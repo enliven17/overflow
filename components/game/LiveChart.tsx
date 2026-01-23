@@ -78,8 +78,8 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
     // Use FIRST price in history as stable reference
     const referencePrice = priceHistory.length > 0 ? priceHistory[0].price : currentPrice;
 
-    // Use ±3% of reference price for Y-axis range
-    const rangePercent = 0.03; // 3%
+    // Use ±1% of reference price for Y-axis range
+    const rangePercent = 0.01; // 1%
     const targetMin = referencePrice * (1 - rangePercent);
     const targetMax = referencePrice * (1 + rangePercent);
 
@@ -189,10 +189,10 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
         // Color based on position relative to current price
         const isUp = rowPriceCenter > currentPrice;
 
-        // Multiplier calculation based on price distance
+        // Multiplier calculation based on price distance (reduced values)
         const priceDist = Math.abs(rowPriceCenter - currentPrice) / priceRange;
-        const timeBonus = Math.max(0, (colX - scales.tipX) / 200) * 0.2;
-        const multiplier = (1.1 + priceDist * 3 + timeBonus).toFixed(2);
+        const timeBonus = Math.max(0, (colX - scales.tipX) / 200) * 0.1;
+        const multiplier = (1.05 + priceDist * 1.5 + timeBonus).toFixed(2);
 
         // Purple gradient color based on distance from current price
         // Close to price = higher opacity, far from price = lower opacity
