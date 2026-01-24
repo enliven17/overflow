@@ -22,6 +22,11 @@ const orbitron = Orbitron({
 export const metadata: Metadata = {
   title: "Overflow",
   description: "Decentralized real-time BTC price prediction game on Flow Blockchain",
+  icons: {
+    icon: "/overflowlogo.ico",
+    shortcut: "/overflowlogo.ico",
+    apple: "/overflowlogo.ico",
+  },
 };
 
 export default function RootLayout({
