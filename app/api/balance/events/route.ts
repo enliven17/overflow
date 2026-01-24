@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
       // Configure Flow
       const network = getCurrentNetwork();
-      configureFlow(network);
+      configureFlow();
 
       // Get contract address from environment or use default
       const contractAddress = process.env.NEXT_PUBLIC_EMULATOR_CONTRACT_ADDRESS || '0xf8d6e0586b0a20c7';

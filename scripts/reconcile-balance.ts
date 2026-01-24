@@ -39,10 +39,10 @@ function parseArgs() {
     dryRun?: boolean;
     admin?: string;
   } = {};
-  
+
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    
+
     switch (arg) {
       case '--user':
       case '-u':
@@ -70,7 +70,7 @@ function parseArgs() {
         process.exit(1);
     }
   }
-  
+
   return options;
 }
 
@@ -114,39 +114,39 @@ async function main() {
   console.log('Balance Reconciliation');
   console.log('='.repeat(60));
   console.log();
-  
+
   // Parse command line arguments
   const options = parseArgs();
-  
+
   // Validate options
   if (!options.user && !options.all) {
     console.error('Error: Must specify either --user or --all');
     printHelp();
     process.exit(1);
   }
-  
+
   if (options.user && options.all) {
     console.error('Error: Cannot specify both --user and --all');
     printHelp();
     process.exit(1);
   }
-  
+
   // Configure Flow
   const network = getCurrentNetwork();
   console.log(`Network: ${network}`);
-  configureFlow(network);
+  configureFlow();
   console.log();
-  
+
   const adminAddress = options.admin || 'ADMIN';
-  
+
   if (options.user) {
     // Reconcile a specific user
     console.log(`Reconciling user: ${options.user}`);
     console.log(`Admin: ${adminAddress}`);
     console.log();
-    
+
     const result = await reconcileUserBalance(options.user, adminAddress);
-    
+
     // Display results
     console.log('='.repeat(60));
     console.log('Results:');
@@ -157,14 +157,14 @@ async function main() {
     console.log(`New Balance: ${result.newBalance.toFixed(8)} FLOW`);
     console.log(`Discrepancy: ${result.discrepancy.toFixed(8)} FLOW`);
     console.log(`Timestamp: ${result.timestamp.toISOString()}`);
-    
+
     if (result.error) {
       console.log(`Error: ${result.error}`);
     }
-    
+
     console.log('='.repeat(60));
     console.log();
-    
+
     // Exit with appropriate code
     if (!result.success) {
       console.error('⚠️  Reconciliation failed');
@@ -179,31 +179,31 @@ async function main() {
     console.log(`Admin: ${adminAddress}`);
     console.log(`Mode: ${options.dryRun ? 'DRY RUN (no updates)' : 'LIVE (will update balances)'}`);
     console.log();
-    
+
     if (options.dryRun) {
       console.log('⚠️  DRY RUN MODE: No balances will be updated');
       console.log();
     }
-    
+
     const results = await reconcileAllUsers(adminAddress, options.dryRun);
-    
+
     // Display results
     console.log('='.repeat(60));
     console.log('Results:');
     console.log('='.repeat(60));
     console.log(`Total users processed: ${results.length}`);
     console.log();
-    
+
     if (results.length === 0) {
       console.log('✓ No discrepancies found');
     } else {
       const successful = results.filter(r => r.success).length;
       const failed = results.filter(r => !r.success).length;
-      
+
       console.log(`Successful: ${successful}`);
       console.log(`Failed: ${failed}`);
       console.log();
-      
+
       // Display details for each user
       results.forEach((result, index) => {
         console.log(`${index + 1}. ${result.userAddress}`);
@@ -217,10 +217,10 @@ async function main() {
         console.log();
       });
     }
-    
+
     console.log('='.repeat(60));
     console.log();
-    
+
     // Exit with appropriate code
     const hasFailures = results.some(r => !r.success);
     if (hasFailures) {

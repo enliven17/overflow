@@ -1,6 +1,6 @@
 import * as fcl from "@onflow/fcl";
 
-export type FlowNetwork = 'testnet';
+export type FlowNetwork = 'testnet' | 'emulator' | 'mainnet';
 
 interface NetworkConfig {
   accessNode: string;
@@ -18,11 +18,11 @@ const getNetworkConfig = (): NetworkConfig => {
 
 export const configureFlow = () => {
   const config = getNetworkConfig();
-  
+
   // Testnet Flow contract addresses
   const flowTokenAddress = '0x7e60df042a9c0868';
   const fungibleTokenAddress = '0x9a0766d93b6608b7';
-  
+
   fcl.config()
     .put("app.detail.title", process.env.NEXT_PUBLIC_APP_NAME || "Overflow")
     .put("app.detail.icon", "https://placekitten.com/g/200/200")
@@ -33,7 +33,7 @@ export const configureFlow = () => {
     .put("0xMockPriceOracle", config.contractAddress)
     .put("0xFlowToken", flowTokenAddress)
     .put("0xFungibleToken", fungibleTokenAddress);
-  
+
   console.log(`Flow configured for testnet network`);
   console.log(`Access Node: ${config.accessNode}`);
   console.log(`Contract Address: ${config.contractAddress}`);

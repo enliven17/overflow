@@ -48,12 +48,12 @@ export const GameBoard: React.FC = () => {
       )}
 
       {/* Modern Quick Bet Panel - Collapsible on Mobile */}
-      <div className="absolute bottom-3 sm:bottom-6 left-3 right-3 sm:left-6 sm:right-auto z-30">
+      <div className="absolute bottom-3 sm:bottom-6 left-3 right-3 sm:left-6 sm:right-auto z-30 pointer-events-none">
 
         {/* Panel - Animated slide up/down on mobile */}
-        <div className={`bg-gradient-to-br from-black/95 via-purple-950/30 to-black/95 backdrop-blur-xl border border-purple-500/20 rounded-2xl shadow-2xl overflow-hidden w-full sm:w-[300px] transition-all duration-300 ease-out ${isPanelOpen
+        <div className={`bg-gradient-to-br from-black/95 via-purple-950/30 to-black/95 backdrop-blur-xl border border-purple-500/20 rounded-2xl shadow-2xl overflow-hidden w-full sm:w-[300px] transition-all duration-300 ease-out pointer-events-auto ${isPanelOpen
           ? 'translate-y-0 opacity-100 scale-100'
-          : 'translate-y-full opacity-0 scale-95 pointer-events-none sm:translate-y-0 sm:opacity-100 sm:scale-100 sm:pointer-events-auto'
+          : 'translate-y-full opacity-0 scale-95 !pointer-events-none sm:translate-y-0 sm:opacity-100 sm:scale-100 sm:!pointer-events-auto'
           }`}>
 
           {/* Close button for mobile */}

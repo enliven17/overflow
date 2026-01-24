@@ -25,7 +25,7 @@ import { checkBalanceSynchronization } from '../lib/balance/synchronization';
  */
 function getContractAddress(): string {
   const network = getCurrentNetwork();
-  
+
   switch (network) {
     case 'emulator':
       return process.env.NEXT_PUBLIC_EMULATOR_CONTRACT_ADDRESS || '0xf8d6e0586b0a20c7';
@@ -46,28 +46,28 @@ async function main() {
   console.log('Balance Synchronization Check');
   console.log('='.repeat(60));
   console.log();
-  
+
   // Configure Flow
   const network = getCurrentNetwork();
   console.log(`Network: ${network}`);
-  configureFlow(network);
-  
+  configureFlow();
+
   // Get contract address
   const contractAddress = getContractAddress();
   console.log(`Contract Address: ${contractAddress}`);
   console.log();
-  
+
   if (!contractAddress) {
     console.error('Error: Contract address not configured for this network');
     process.exit(1);
   }
-  
+
   // Run synchronization check
   console.log('Running synchronization check...');
   console.log();
-  
+
   const result = await checkBalanceSynchronization(contractAddress);
-  
+
   // Display results
   console.log('='.repeat(60));
   console.log('Results:');
@@ -77,14 +77,14 @@ async function main() {
   console.log(`Escrow Vault Balance: ${result.escrowVaultBalance.toFixed(8)} FLOW`);
   console.log(`Discrepancy: ${result.discrepancy.toFixed(8)} FLOW`);
   console.log(`Timestamp: ${result.timestamp.toISOString()}`);
-  
+
   if (result.error) {
     console.log(`Error: ${result.error}`);
   }
-  
+
   console.log('='.repeat(60));
   console.log();
-  
+
   // Exit with appropriate code
   if (result.error || !result.synchronized) {
     console.error('⚠️  Synchronization check failed or balances are not synchronized');

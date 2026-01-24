@@ -20,25 +20,25 @@ export const ErrorCode = {
   // Insufficient Balance Errors
   INSUFFICIENT_WALLET_BALANCE: 'INSUFFICIENT_WALLET_BALANCE',
   INSUFFICIENT_HOUSE_BALANCE: 'INSUFFICIENT_HOUSE_BALANCE',
-  
+
   // Validation Errors
   INVALID_AMOUNT: 'INVALID_AMOUNT',
   INVALID_ADDRESS: 'INVALID_ADDRESS',
-  
+
   // Authorization Errors
   UNAUTHORIZED: 'UNAUTHORIZED',
   SIGNER_MISMATCH: 'SIGNER_MISMATCH',
-  
+
   // Database Errors
   DB_CONNECTION_ERROR: 'DB_CONNECTION_ERROR',
   DB_QUERY_ERROR: 'DB_QUERY_ERROR',
   CONSTRAINT_VIOLATION: 'CONSTRAINT_VIOLATION',
-  
+
   // Blockchain Errors
   TX_FAILED: 'TX_FAILED',
   TX_TIMEOUT: 'TX_TIMEOUT',
   NETWORK_ERROR: 'NETWORK_ERROR',
-  
+
   // Synchronization Errors
   SYNC_ERROR: 'SYNC_ERROR',
 } as const;
@@ -57,25 +57,25 @@ export const ErrorMessages: Record<ErrorCodeType, string> = {
   // Insufficient Balance Errors
   [ErrorCode.INSUFFICIENT_WALLET_BALANCE]: 'Insufficient wallet balance for deposit',
   [ErrorCode.INSUFFICIENT_HOUSE_BALANCE]: 'Insufficient house balance. Please deposit more FLOW.',
-  
+
   // Validation Errors
   [ErrorCode.INVALID_AMOUNT]: 'Amount must be greater than zero',
   [ErrorCode.INVALID_ADDRESS]: 'Invalid wallet address format',
-  
+
   // Authorization Errors
   [ErrorCode.UNAUTHORIZED]: 'You are not authorized to perform this operation',
   [ErrorCode.SIGNER_MISMATCH]: 'Transaction signer does not match user address',
-  
+
   // Database Errors
   [ErrorCode.DB_CONNECTION_ERROR]: 'Service temporarily unavailable. Please try again.',
   [ErrorCode.DB_QUERY_ERROR]: 'An error occurred processing your request',
   [ErrorCode.CONSTRAINT_VIOLATION]: 'Operation would result in invalid balance',
-  
+
   // Blockchain Errors
   [ErrorCode.TX_FAILED]: 'Transaction failed. Please try again.',
   [ErrorCode.TX_TIMEOUT]: 'Transaction timed out. Please check your wallet.',
   [ErrorCode.NETWORK_ERROR]: 'Unable to connect to blockchain. Please check your connection.',
-  
+
   // Synchronization Errors
   [ErrorCode.SYNC_ERROR]: 'Balance synchronization error detected',
 };
@@ -83,7 +83,7 @@ export const ErrorMessages: Record<ErrorCodeType, string> = {
 /**
  * Context-specific error messages for different operations
  */
-export const ContextualErrorMessages = {
+export const ContextualErrorMessages: Record<'deposit' | 'bet' | 'withdrawal', Partial<Record<ErrorCodeType, string>>> = {
   deposit: {
     [ErrorCode.INSUFFICIENT_WALLET_BALANCE]: 'Insufficient wallet balance for deposit',
     [ErrorCode.INSUFFICIENT_HOUSE_BALANCE]: 'Insufficient wallet balance for deposit',
@@ -213,7 +213,7 @@ export function getErrorMessage(
   if (context && ContextualErrorMessages[context]?.[code]) {
     return ContextualErrorMessages[context][code];
   }
-  
+
   // Fall back to default message
   return ErrorMessages[code];
 }
@@ -228,14 +228,14 @@ export function extractErrorCode(error: unknown): ErrorCodeType | undefined {
   if (error instanceof HouseBalanceError) {
     return error.code;
   }
-  
+
   if (typeof error === 'object' && error !== null && 'code' in error) {
     const code = (error as { code: string }).code;
     if (Object.values(ErrorCode).includes(code as ErrorCodeType)) {
       return code as ErrorCodeType;
     }
   }
-  
+
   return undefined;
 }
 
@@ -254,23 +254,23 @@ export function formatErrorForDisplay(
   if (error instanceof HouseBalanceError) {
     return getErrorMessage(error.code, context);
   }
-  
+
   // Handle errors with error codes
   const errorCode = extractErrorCode(error);
   if (errorCode) {
     return getErrorMessage(errorCode, context);
   }
-  
+
   // Handle Error instances with messages
   if (error instanceof Error) {
     return error.message;
   }
-  
+
   // Handle string errors
   if (typeof error === 'string') {
     return error;
   }
-  
+
   // Default fallback
   return 'An unexpected error occurred';
 }
@@ -311,26 +311,26 @@ export function isRetryableError(error: unknown): boolean {
   if (error instanceof DatabaseError && error.code === ErrorCode.DB_CONNECTION_ERROR) {
     return true;
   }
-  
+
   // Retry network errors
   if (error instanceof BlockchainError && error.code === ErrorCode.NETWORK_ERROR) {
     return true;
   }
-  
+
   // Check for Supabase connection errors
   if (typeof error === 'object' && error !== null) {
     const errorObj = error as { message?: string; code?: string };
-    
+
     // Common Supabase connection error patterns
     if (errorObj.message?.includes('connection') ||
-        errorObj.message?.includes('timeout') ||
-        errorObj.message?.includes('ECONNREFUSED') ||
-        errorObj.code === 'PGRST301' || // Connection error
-        errorObj.code === 'PGRST504') { // Gateway timeout
+      errorObj.message?.includes('timeout') ||
+      errorObj.message?.includes('ECONNREFUSED') ||
+      errorObj.code === 'PGRST301' || // Connection error
+      errorObj.code === 'PGRST504') { // Gateway timeout
       return true;
     }
   }
-  
+
   return false;
 }
 
@@ -369,20 +369,20 @@ export async function withRetry<T>(
   config: RetryConfig = DEFAULT_RETRY_CONFIG
 ): Promise<T> {
   let lastError: unknown;
-  
+
   for (let attempt = 0; attempt < config.maxAttempts; attempt++) {
     try {
       // Execute the operation
       return await operation();
     } catch (error) {
       lastError = error;
-      
+
       // Check if we should retry
       if (!isRetryableError(error)) {
         // Not a retryable error, throw immediately
         throw error;
       }
-      
+
       // Check if we have more attempts
       if (attempt < config.maxAttempts - 1) {
         // Calculate delay and wait before retrying
@@ -402,7 +402,7 @@ export async function withRetry<T>(
       }
     }
   }
-  
+
   // All attempts failed, throw the last error
   throw lastError;
 }
@@ -428,13 +428,13 @@ export async function executeDatabaseOperation<T>(
     if (error instanceof DatabaseError) {
       throw error;
     }
-    
+
     // Determine error code based on error type
     const isConnectionError = isRetryableError(error);
     const errorCode = isConnectionError
       ? ErrorCode.DB_CONNECTION_ERROR
       : ErrorCode.DB_QUERY_ERROR;
-    
+
     throw new DatabaseError(errorCode, `${errorContext}: ${formatErrorForDisplay(error)}`, error);
   }
 }
@@ -466,7 +466,7 @@ export function logError(
     } : error,
     context,
   };
-  
+
   if (severity === 'critical') {
     console.error('CRITICAL ERROR:', JSON.stringify(errorInfo, null, 2));
   } else if (severity === 'warn') {

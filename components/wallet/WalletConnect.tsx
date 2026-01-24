@@ -21,6 +21,7 @@ export const WalletConnect: React.FC = () => {
         onClick={connect}
         disabled={isConnecting}
         variant="primary"
+        className="text-[10px] sm:text-sm px-2 sm:px-4 py-1 sm:py-2 h-auto"
       >
         {isConnecting ? 'Connecting...' : 'Connect Wallet'}
       </Button>
