@@ -622,6 +622,9 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
         <p className="text-white text-2xl sm:text-4xl font-black font-mono tracking-tight">
           ${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
+        <span className="inline-block mt-1 px-1.5 py-0.5 bg-purple-500/20 border border-purple-400/30 rounded text-[8px] sm:text-[9px] text-purple-300 font-medium">
+          PYTH
+        </span>
       </div>
 
       {/* Insufficient Funds Warning - Minimalist Toast */}
