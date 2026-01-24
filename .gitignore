@@ -44,3 +44,5 @@ flow.json.backup
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel

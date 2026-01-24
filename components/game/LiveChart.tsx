@@ -32,6 +32,7 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
   const activeBets = useStore((state) => state.activeBets);
   const resolveBet = useStore((state) => state.resolveBet);
   const fetchBalance = useStore((state) => state.fetchBalance);
+  const updateBalance = useStore((state) => state.updateBalance);
   const userAddress = useStore((state) => state.address);
   const houseBalance = useStore((state) => state.houseBalance);
 
@@ -392,9 +393,11 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
           playLoseSound();
         }
 
-        // Update house balance via API
-        if (userAddress) {
-          // If won, credit the winnings
+        // Update house balance via API (skip for demo mode)
+        const isDemoMode = userAddress?.startsWith('0xDEMO');
+
+        if (userAddress && !isDemoMode) {
+          // Real mode - use API
           if (won) {
             fetch('/api/balance/win', {
               method: 'POST',
@@ -411,6 +414,9 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
             // If lost, just refresh balance (already deducted)
             fetchBalance(userAddress);
           }
+        } else if (isDemoMode && won) {
+          // Demo mode - update locally on win (bet amount already subtracted)
+          updateBalance(payout, 'add');
         }
 
         // Add to resolved cells for visual feedback
@@ -527,9 +533,14 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
                     return newMap;
                   });
 
-                  // Refresh balance after bet
-                  if (userAddress) {
+                  // Update balance after bet
+                  const isDemoMode = userAddress?.startsWith('0xDEMO');
+                  if (userAddress && !isDemoMode) {
+                    // Real mode - fetch from API
                     fetchBalance(userAddress);
+                  } else if (isDemoMode) {
+                    // Demo mode - update locally
+                    updateBalance(result.bet.amount, 'subtract');
                   }
                 }
               } catch (error) {

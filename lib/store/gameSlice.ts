@@ -260,6 +260,37 @@ export const createGameSlice: StateCreator<GameState> = (set, get) => ({
         multiplier = target.multiplier;
       }
 
+      // DEMO MODE: Skip API call for demo addresses
+      const isDemoMode = formattedAddress.startsWith('0xDEMO');
+
+      if (isDemoMode) {
+        set({ isPlacingBet: true, error: null });
+
+        // Simulate bet placement without API
+        const fakeBetId = `demo-${Date.now()}`;
+
+        // Create active bet for tracking
+        const activeBet: ActiveBet = {
+          id: fakeBetId,
+          cellId: cellId || targetId,
+          amount: betAmount,
+          multiplier: multiplier,
+          direction: direction,
+          timestamp: Date.now()
+        };
+
+        // Add to active bets
+        addActiveBet(activeBet);
+
+        set({ isPlacingBet: false, error: null });
+
+        return {
+          betId: fakeBetId,
+          remainingBalance: 1000 - betAmount, // Fake remaining balance
+          bet: activeBet
+        };
+      }
+
       set({ isPlacingBet: true, error: null });
 
       // Call API endpoint to place bet from house balance

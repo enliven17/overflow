@@ -13,12 +13,16 @@ export interface WalletState {
   isConnected: boolean;
   isConnecting: boolean;
   error: string | null;
-  
+
   // Actions
   connect: () => Promise<void>;
   disconnect: () => void;
   refreshBalance: () => Promise<void>;
   clearError: () => void;
+
+  // Setters for demo mode
+  setAddress: (address: string | null) => void;
+  setIsConnected: (connected: boolean) => void;
 }
 
 /**
@@ -32,7 +36,7 @@ export const createWalletSlice: StateCreator<WalletState> = (set, get) => ({
   isConnected: false,
   isConnecting: false,
   error: null,
-  
+
   /**
    * Connect wallet using FCL authentication
    * Triggers FCL authentication flow and updates state on success/failure
@@ -41,13 +45,13 @@ export const createWalletSlice: StateCreator<WalletState> = (set, get) => ({
   connect: async () => {
     try {
       set({ isConnecting: true, error: null });
-      
+
       // Authenticate with FCL
       await fcl.authenticate();
-      
+
       // Get current user
       const user = await fcl.currentUser.snapshot();
-      
+
       if (user.loggedIn && user.addr) {
         // Update state with connected wallet
         set({
@@ -56,7 +60,7 @@ export const createWalletSlice: StateCreator<WalletState> = (set, get) => ({
           isConnecting: false,
           error: null
         });
-        
+
         // Persist session to localStorage
         if (typeof window !== 'undefined') {
           localStorage.setItem('overflow_wallet_session', JSON.stringify({
@@ -64,7 +68,7 @@ export const createWalletSlice: StateCreator<WalletState> = (set, get) => ({
             timestamp: Date.now()
           }));
         }
-        
+
         // Fetch initial balance
         await get().refreshBalance();
       } else {
@@ -78,19 +82,19 @@ export const createWalletSlice: StateCreator<WalletState> = (set, get) => ({
       });
     }
   },
-  
+
   /**
    * Disconnect wallet and clear session
    * Unauthenticates from FCL and clears localStorage
    */
   disconnect: () => {
     fcl.unauthenticate();
-    
+
     // Clear localStorage session
     if (typeof window !== 'undefined') {
       localStorage.removeItem('overflow_wallet_session');
     }
-    
+
     // Reset state
     set({
       address: null,
@@ -100,18 +104,18 @@ export const createWalletSlice: StateCreator<WalletState> = (set, get) => ({
       error: null
     });
   },
-  
+
   /**
    * Refresh FLOW token balance for connected wallet
    * Queries blockchain for current balance
    */
   refreshBalance: async () => {
     const { address, isConnected } = get();
-    
+
     if (!isConnected || !address) {
       return;
     }
-    
+
     try {
       // Query balance using FCL script
       const balance = await fcl.query({
@@ -133,7 +137,7 @@ export const createWalletSlice: StateCreator<WalletState> = (set, get) => ({
         `,
         args: (arg: any, t: any) => [arg(address, t.Address)]
       });
-      
+
       // Update balance in state
       set({ balance: balance.toString() });
     } catch (error) {
@@ -143,12 +147,26 @@ export const createWalletSlice: StateCreator<WalletState> = (set, get) => ({
       });
     }
   },
-  
+
   /**
    * Clear error message
    */
   clearError: () => {
     set({ error: null });
+  },
+
+  /**
+   * Set address (for demo mode)
+   */
+  setAddress: (address: string | null) => {
+    set({ address });
+  },
+
+  /**
+   * Set connected status (for demo mode)
+   */
+  setIsConnected: (connected: boolean) => {
+    set({ isConnected: connected });
   }
 });
 
@@ -165,26 +183,26 @@ export const restoreWalletSession = async (
     if (typeof window === 'undefined') {
       return;
     }
-    
+
     // Check if user is already authenticated with FCL
     const user = await fcl.currentUser.snapshot();
-    
+
     if (user.loggedIn && user.addr) {
       // User is already authenticated, trigger connect to update state
       await connect();
       return;
     }
-    
+
     // Check localStorage for previous session
     const sessionData = localStorage.getItem('overflow_wallet_session');
-    
+
     if (sessionData) {
       const session = JSON.parse(sessionData);
-      
+
       // Check if session is recent (within 24 hours)
       const sessionAge = Date.now() - session.timestamp;
       const maxAge = 24 * 60 * 60 * 1000; // 24 hours
-      
+
       if (sessionAge < maxAge) {
         // Attempt to restore session
         await connect();
