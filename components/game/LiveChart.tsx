@@ -33,6 +33,7 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
   const resolveBet = useStore((state) => state.resolveBet);
   const fetchBalance = useStore((state) => state.fetchBalance);
   const userAddress = useStore((state) => state.address);
+  const houseBalance = useStore((state) => state.houseBalance);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -43,6 +44,9 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
 
   // Local state for tracking cell bets (cells with active bets)
   const [cellBets, setCellBets] = useState<Map<string, CellBet>>(new Map());
+
+  // Warning state for insufficient funds
+  const [showInsufficientFunds, setShowInsufficientFunds] = useState(false);
 
   // Bet results for visual feedback (win/lose notifications)
   interface BetResult {
@@ -489,6 +493,17 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
 
           const handleClick = async () => {
             if (canBet && betAmount && userAddress) {
+              // Check if user has sufficient balance
+              const requiredAmount = parseFloat(betAmount);
+              const currentBalance = houseBalance || 0;
+
+              if (currentBalance < requiredAmount) {
+                // Show insufficient funds warning
+                setShowInsufficientFunds(true);
+                setTimeout(() => setShowInsufficientFunds(false), 2000);
+                return;
+              }
+
               try {
                 // Place bet using house balance - no wallet signature required
                 const result = await placeBetFromHouseBalance(
@@ -608,6 +623,17 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
           ${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
       </div>
+
+      {/* Insufficient Funds Warning - Minimalist Toast */}
+      {showInsufficientFunds && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-50">
+          <div className="px-4 py-2 bg-orange-500/20 backdrop-blur-md border border-orange-400/40 rounded-xl">
+            <p className="text-orange-300 text-sm font-medium">
+              Insufficient balance
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Bet Result Notifications - Modern floating feedback */}
       <div className="absolute inset-0 z-50 pointer-events-none overflow-hidden">
