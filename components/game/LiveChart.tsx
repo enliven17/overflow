@@ -284,14 +284,38 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
         // Color based on position relative to current price
         const isUp = rowPriceCenter > currentPrice;
 
-        // Multiplier calculation based on price distance (reduced values)
-        const priceDist = Math.abs(rowPriceCenter - currentPrice) / priceRange;
-        const timeBonus = Math.max(0, (colX - scales.tipX) / 200) * 0.1;
-        const multiplier = (1.05 + priceDist * 1.5 + timeBonus).toFixed(2);
+        // Multiplier calculation based on price distance
+        // The row containing current price gets lowest multiplier
+        // Further rows get progressively higher multipliers
+
+        // Check if current price is inside this row
+        const priceInRow = currentPrice <= rowPriceTop && currentPrice >= rowPriceBottom;
+
+        let baseMultiplier: number;
+        if (priceInRow) {
+          // Current price is in this row - lowest multiplier
+          baseMultiplier = 1.01;
+        } else {
+          // Calculate distance based on how many rows away
+          const priceDist = Math.abs(rowPriceCenter - currentPrice) / priceRange;
+          const normalizedDist = Math.min(priceDist * 2, 1); // 0-1
+
+          // Exponential scaling for dramatic difference
+          // 1 row away: ~1.15
+          // 2 rows away: ~1.40
+          // 3 rows away: ~1.80
+          // 4+ rows away: 2.5 - 4.5
+          baseMultiplier = 1.05 + Math.pow(normalizedDist, 1.2) * 3.45;
+        }
+
+        // Small time bonus for cells further in time
+        const timeBonus = Math.max(0, (colX - scales.tipX) / 500) * 0.15;
+        const multiplier = Math.min(baseMultiplier + timeBonus, 5.0).toFixed(2);
 
         // Purple gradient color based on distance from current price
         // Close to price = higher opacity, far from price = lower opacity
-        const intensity = Math.min(priceDist * 2, 1); // 0 to 1
+        const colorPriceDist = Math.abs(rowPriceCenter - currentPrice) / priceRange;
+        const intensity = Math.min(colorPriceDist * 2, 1); // 0 to 1
         const hue = 270; // Purple hue
         const saturation = 50 + intensity * 30; // 50-80%
         const lightness = 45; // Fixed lightness
