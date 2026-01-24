@@ -4,7 +4,6 @@ import React from 'react';
 import { GameBoard } from '@/components/game';
 import { BetHistory } from '@/components/history';
 import { WalletConnect, WalletInfo } from '@/components/wallet';
-import { NetworkSelector } from '@/components/NetworkSelector';
 
 export default function Home() {
   return (
@@ -19,14 +18,13 @@ export default function Home() {
             >
               OVERFLOW
             </span>
-            <span className="hidden sm:inline text-purple-400 text-[10px] font-mono font-normal border border-purple-400/50 px-2 py-0.5 rounded bg-purple-400/10">
-              BETA
+            <span className="text-yellow-400 text-[10px] font-mono font-normal border border-yellow-400/50 px-2 py-0.5 rounded bg-yellow-400/10">
+              TESTNET
             </span>
           </h1>
         </div>
 
         <div className="pointer-events-auto flex items-center gap-2 sm:gap-4">
-          <NetworkSelector />
           <WalletConnect />
         </div>
       </header>

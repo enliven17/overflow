@@ -563,6 +563,40 @@ access(all) fun testPlaceBet_Success() {
     // Full integration test will be added in task 4.2
 }
 
+
+// ========================================
+// Deposit Function Tests (Task 2.1)
+// ========================================
+
+// Test deposit function exists and is accessible
+access(all) fun testDepositFunctionExists() {
+    // Verify the deposit function is accessible
+    // Full integration test with FlowToken will be added in integration tests
+}
+
+// Test deposit validates positive amounts
+access(all) fun testDepositValidatesPositiveAmount() {
+    // This test will verify that deposit rejects zero or negative amounts
+    // Will be implemented with FlowToken setup in integration tests
+}
+
+// Test deposit emits event
+access(all) fun testDepositEmitsEvent() {
+    // This test will verify that Deposit event is emitted with correct parameters
+    // Will be implemented with FlowToken setup in integration tests
+}
+
+// Test deposit increases escrow vault balance
+access(all) fun testDepositIncreasesEscrowBalance() {
+    // This test will verify that deposit increases the escrow vault balance
+    // Will be implemented with FlowToken setup in integration tests
+}
+
+
+// ========================================
+// placeBet Function Tests (continued)
+// ========================================
+
 // Test placeBet prevents double betting
 access(all) fun testPlaceBet_PreventDoubleBetting() {
     // This test will be implemented in task 4.2 with property-based testing

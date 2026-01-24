@@ -3,14 +3,14 @@
 import React, { useState } from 'react';
 import { useStore } from '@/lib/store';
 import { LiveChart } from './LiveChart';
-import { RoundTimer } from './RoundTimer';
+import { BalanceDisplay } from '@/components/balance';
 
 export const GameBoard: React.FC = () => {
   const [betAmount, setBetAmount] = useState<string>('1.0');
   const [activeTab, setActiveTab] = useState<'bet' | 'wallet'>('bet');
   const [isPanelOpen, setIsPanelOpen] = useState(true);
 
-  const activeRound = useStore((state) => state.activeRound);
+  // Instant resolution system - no activeRound needed
   const address = useStore((state) => state.address);
   const balance = useStore((state) => state.balance);
   const isConnected = useStore((state) => state.isConnected);
@@ -35,14 +35,7 @@ export const GameBoard: React.FC = () => {
         />
       </div>
 
-      {/* Timer Overlay */}
-      {activeRound && (
-        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
-          <div className="pointer-events-auto scale-125">
-            <RoundTimer />
-          </div>
-        </div>
-      )}
+      {/* Instant resolution - no timer needed */}
 
       {/* Floating Toggle Button - Fixed to bottom (Mobile only) */}
       {!isPanelOpen && (
@@ -144,15 +137,18 @@ export const GameBoard: React.FC = () => {
               <div className="space-y-4">
                 {isConnected && address ? (
                   <>
+                    {/* House Balance Display */}
+                    <BalanceDisplay />
+
                     {/* Address Card */}
                     <div className="bg-black/30 rounded-xl p-3 border border-white/5">
-                      <p className="text-gray-500 text-[10px] uppercase tracking-widest mb-1">Address</p>
+                      <p className="text-gray-500 text-[10px] uppercase tracking-widest mb-1">Wallet Address</p>
                       <p className="text-white font-mono text-sm">{formatAddress(address)}</p>
                     </div>
 
-                    {/* Balance Display */}
+                    {/* Wallet Balance Display */}
                     <div className="bg-gradient-to-br from-purple-500/10 to-transparent rounded-xl p-4 border border-purple-500/20">
-                      <p className="text-gray-400 text-[10px] uppercase tracking-widest mb-1">Balance</p>
+                      <p className="text-gray-400 text-[10px] uppercase tracking-widest mb-1">Wallet Balance</p>
                       <div className="flex items-baseline gap-2">
                         <span className="text-2xl font-bold text-white">{formatBalance(balance)}</span>
                         <span className="text-purple-400 text-sm font-medium">FLOW</span>

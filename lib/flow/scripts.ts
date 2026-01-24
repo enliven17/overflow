@@ -124,3 +124,38 @@ access(all) fun main(): UFix64 {
 }
 `;
 };
+
+/**
+ * Script to get escrow vault balance
+ * @returns Cadence script code
+ */
+export const getEscrowVaultBalanceScript = () => {
+  return `
+import FlowToken from 0xFlowToken
+import OverflowGame from 0xOverflowGame
+
+access(all) fun main(contractAddress: Address): UFix64 {
+  let account = getAccount(contractAddress)
+  let vaultRef = account.storage.borrow<&FlowToken.Vault>(
+    from: /storage/OverflowGameEscrowVault
+  ) ?? panic("Could not borrow reference to Escrow Vault")
+  
+  return vaultRef.balance
+}
+`;
+};
+
+/**
+ * Script to get user balance from contract
+ * Note: This queries the contract's internal balance tracking for a specific user
+ * @returns Cadence script code
+ */
+export const getUserBalanceFromContractScript = () => {
+  return `
+import OverflowGame from 0xOverflowGame
+
+access(all) fun main(userAddress: Address): UFix64 {
+  return OverflowGame.getUserBalance(userAddress: userAddress)
+}
+`;
+};

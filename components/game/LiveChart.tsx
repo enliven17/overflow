@@ -16,10 +16,23 @@ interface ResolvedCell {
   timestamp: number;
 }
 
+// Track which cells have active bets
+interface CellBet {
+  cellId: string;
+  betId: string;
+  amount: number;
+  multiplier: number;
+  direction: 'UP' | 'DOWN';
+}
+
 export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount }) => {
   const priceHistory = useStore((state) => state.priceHistory);
   const currentPrice = useStore((state) => state.currentPrice);
-  const placeBet = useStore((state) => state.placeBet);
+  const placeBetFromHouseBalance = useStore((state) => state.placeBetFromHouseBalance);
+  const activeBets = useStore((state) => state.activeBets);
+  const resolveBet = useStore((state) => state.resolveBet);
+  const fetchBalance = useStore((state) => state.fetchBalance);
+  const userAddress = useStore((state) => state.address);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -27,6 +40,88 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
 
   // Track resolved (past) cells - cells that have been "hit" by the chart
   const [resolvedCells, setResolvedCells] = useState<ResolvedCell[]>([]);
+
+  // Local state for tracking cell bets (cells with active bets)
+  const [cellBets, setCellBets] = useState<Map<string, CellBet>>(new Map());
+
+  // Bet results for visual feedback (win/lose notifications)
+  interface BetResult {
+    id: string;
+    won: boolean;
+    amount: number;
+    payout: number;
+    multiplier: number;
+    timestamp: number;
+    x: number;
+    y: number;
+  }
+  const [betResults, setBetResults] = useState<BetResult[]>([]);
+
+  // Sound effects using Web Audio API
+  const playWinSound = useCallback(() => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+
+      // Win sound - ascending happy tones
+      const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+      notes.forEach((freq, i) => {
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        oscillator.frequency.value = freq;
+        oscillator.type = 'sine';
+
+        const startTime = audioCtx.currentTime + i * 0.1;
+        gainNode.gain.setValueAtTime(0.3, startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.3);
+
+        oscillator.start(startTime);
+        oscillator.stop(startTime + 0.3);
+      });
+    } catch (e) {
+      console.log('Audio not available');
+    }
+  }, []);
+
+  const playLoseSound = useCallback(() => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+
+      // Lose sound - descending sad tones
+      const notes = [392.00, 349.23, 293.66]; // G4, F4, D4
+      notes.forEach((freq, i) => {
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        oscillator.frequency.value = freq;
+        oscillator.type = 'triangle';
+
+        const startTime = audioCtx.currentTime + i * 0.15;
+        gainNode.gain.setValueAtTime(0.2, startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.4);
+
+        oscillator.start(startTime);
+        oscillator.stop(startTime + 0.4);
+      });
+    } catch (e) {
+      console.log('Audio not available');
+    }
+  }, []);
+
+  // Auto-remove bet results after 3 seconds
+  useEffect(() => {
+    if (betResults.length === 0) return;
+    const timer = setTimeout(() => {
+      setBetResults(prev => prev.filter(r => Date.now() - r.timestamp < 3000));
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [betResults, now]);
 
   // Stable Y-Axis Domain
   const yDomain = useRef({ min: 0, max: 100, initialized: false });
@@ -78,8 +173,8 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
     // Use FIRST price in history as stable reference
     const referencePrice = priceHistory.length > 0 ? priceHistory[0].price : currentPrice;
 
-    // Use ±1% of reference price for Y-axis range
-    const rangePercent = 0.01; // 1%
+    // Use ±0.5% of reference price for Y-axis range
+    const rangePercent = 0.005; // 0.5%
     const targetMin = referencePrice * (1 - rangePercent);
     const targetMax = referencePrice * (1 + rangePercent);
 
@@ -214,13 +309,94 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
           isUp,
           status,
           color: cellColor,
-          borderColor: borderColor
+          borderColor: borderColor,
+          priceTop: rowPriceTop,
+          priceBottom: rowPriceBottom
         });
       }
     }
 
     return cells;
   }, [scales, now, currentPrice, dimensions]);
+
+  // Handle bet resolution when chart crosses cells with active bets
+  useEffect(() => {
+    if (!scales || cellBets.size === 0) return;
+
+    betCells.forEach((cell: any) => {
+      const bet = cellBets.get(cell.id);
+      if (!bet) return;
+
+      // Check if this cell is being crossed or has been passed
+      const isCrossing = cell.status === 'active' || cell.status === 'won' || cell.status === 'lost';
+
+      if (isCrossing) {
+        // Determine if bet won or lost based on current price
+        const won = currentPrice <= cell.priceTop && currentPrice >= cell.priceBottom;
+        const payout = won ? bet.amount * bet.multiplier : 0;
+
+        // Remove from cellBets
+        setCellBets(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(cell.id);
+          return newMap;
+        });
+
+        // Resolve the bet in the store
+        resolveBet(bet.betId, won, payout);
+
+        // Add bet result notification
+        setBetResults(prev => [...prev, {
+          id: `result-${bet.betId}`,
+          won,
+          amount: bet.amount,
+          payout,
+          multiplier: bet.multiplier,
+          timestamp: Date.now(),
+          x: cell.x,
+          y: cell.y
+        }]);
+
+        // Play sound effect
+        if (won) {
+          playWinSound();
+        } else {
+          playLoseSound();
+        }
+
+        // Update house balance via API
+        if (userAddress) {
+          // If won, credit the winnings
+          if (won) {
+            fetch('/api/balance/win', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userAddress,
+                winAmount: payout,
+                betId: bet.betId
+              })
+            }).then(() => {
+              fetchBalance(userAddress);
+            }).catch(console.error);
+          } else {
+            // If lost, just refresh balance (already deducted)
+            fetchBalance(userAddress);
+          }
+        }
+
+        // Add to resolved cells for visual feedback
+        setResolvedCells(prev => [...prev, {
+          id: cell.id,
+          row: 0,
+          won,
+          timestamp: Date.now()
+        }]);
+
+        console.log(`Bet resolved: ${won ? 'WON' : 'LOST'} - Amount: ${bet.amount}, Multiplier: ${bet.multiplier}, Payout: ${payout}`);
+      }
+    });
+  }, [betCells, cellBets, scales, currentPrice, resolveBet, userAddress, fetchBalance, playWinSound, playLoseSound]);
 
   return (
     <div ref={containerRef} className="absolute inset-0 z-0 bg-[#02040A] overflow-hidden select-none">
@@ -287,11 +463,50 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
             extraClass = 'ring-1 ring-white/30';
           }
 
-          const handleClick = () => {
-            if (canBet && betAmount) {
-              placeBet(betAmount, `${cell.isUp ? 'UP' : 'DOWN'}-${cell.multiplier}`);
+          const handleClick = async () => {
+            if (canBet && betAmount && userAddress) {
+              try {
+                // Place bet using house balance - no wallet signature required
+                const result = await placeBetFromHouseBalance(
+                  betAmount,
+                  `${cell.isUp ? 'UP' : 'DOWN'}-${cell.multiplier}`,
+                  userAddress,
+                  cell.id // Pass the cell ID
+                );
+
+                if (result && result.bet) {
+                  // Add to local cell bets for visual tracking
+                  setCellBets(prev => {
+                    const newMap = new Map(prev);
+                    newMap.set(cell.id, {
+                      cellId: cell.id,
+                      betId: result.betId,
+                      amount: result.bet.amount,
+                      multiplier: result.bet.multiplier,
+                      direction: result.bet.direction
+                    });
+                    return newMap;
+                  });
+
+                  // Refresh balance after bet
+                  if (userAddress) {
+                    fetchBalance(userAddress);
+                  }
+                }
+              } catch (error) {
+                console.error('Failed to place bet:', error);
+              }
             }
           };
+
+          // Check if this cell has an active bet
+          const hasBet = cellBets.has(cell.id);
+          if (hasBet) {
+            // Highlight cells with active bets - cyan glow
+            bg = 'rgba(0, 255, 255, 0.4)';
+            borderStyle = '2px solid #00FFFF';
+            extraClass = 'ring-2 ring-cyan-400/50 animate-pulse';
+          }
 
           return (
             <div
@@ -368,6 +583,75 @@ export const LiveChart: React.FC<LiveChartProps> = ({ betAmount, setBetAmount })
         <p className="text-white text-2xl sm:text-4xl font-black font-mono tracking-tight">
           ${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
+      </div>
+
+      {/* Bet Result Notifications - Modern floating feedback */}
+      <div className="absolute inset-0 z-50 pointer-events-none overflow-hidden">
+        {betResults.map((result) => {
+          const age = Date.now() - result.timestamp;
+          const opacity = Math.max(0, 1 - age / 3000);
+          const translateY = -age / 20; // Float upward faster
+
+          return (
+            <div
+              key={result.id}
+              className="absolute"
+              style={{
+                left: Math.min(Math.max(result.x, 80), dimensions.width - 140),
+                top: Math.min(Math.max(result.y + translateY, 40), dimensions.height - 120),
+                opacity,
+                transform: `translateY(${translateY}px)`,
+              }}
+            >
+              {/* Modern Glassmorphism Card */}
+              <div className={`
+                relative px-5 py-3 rounded-2xl backdrop-blur-xl
+                ${result.won
+                  ? 'bg-gradient-to-br from-green-500/30 via-emerald-500/20 to-green-600/30 border border-green-400/60 shadow-[0_0_30px_rgba(34,197,94,0.4)]'
+                  : 'bg-gradient-to-br from-red-500/30 via-rose-500/20 to-red-600/30 border border-red-400/60 shadow-[0_0_30px_rgba(239,68,68,0.4)]'
+                }
+              `}>
+                {/* Animated glow ring */}
+                <div className={`absolute -inset-1 rounded-2xl blur-sm ${result.won ? 'bg-green-400/20' : 'bg-red-400/20'} animate-pulse`} />
+
+                {/* Content */}
+                <div className="relative flex items-center gap-3">
+                  {/* Icon */}
+                  <div className={`
+                    w-10 h-10 rounded-xl flex items-center justify-center text-xl
+                    ${result.won
+                      ? 'bg-green-400/30 text-green-300'
+                      : 'bg-red-400/30 text-red-300'
+                    }
+                  `}>
+                    {result.won ? '✓' : '✕'}
+                  </div>
+
+                  {/* Text */}
+                  <div>
+                    <p className={`text-sm font-black tracking-wide ${result.won ? 'text-green-300' : 'text-red-300'}`}>
+                      {result.won ? 'WIN!' : 'LOST'}
+                    </p>
+                    <p className={`text-lg font-bold ${result.won ? 'text-green-100' : 'text-red-100'}`}>
+                      {result.won
+                        ? `+${result.payout.toFixed(2)}`
+                        : `-${result.amount.toFixed(2)}`
+                      }
+                      <span className="text-xs ml-1 opacity-70">FLOW</span>
+                    </p>
+                  </div>
+
+                  {/* Multiplier badge (for wins) */}
+                  {result.won && (
+                    <div className="px-2 py-0.5 rounded-lg bg-green-400/20 text-green-200 text-xs font-bold">
+                      x{result.multiplier}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

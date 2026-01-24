@@ -5,6 +5,7 @@ import { useOverflowStore } from '@/lib/store';
 import { configureFlow } from '@/lib/flow/config';
 import { restoreWalletSession } from '@/lib/store/walletSlice';
 import { startPriceFeed } from '@/lib/store/gameSlice';
+import { ToastProvider } from '@/components/ui/ToastProvider';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const initialized = useRef(false);
@@ -17,10 +18,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
     
     const initializeApp = async () => {
       try {
-        // Configure Flow for emulator (change to 'testnet' or 'mainnet' as needed)
-        const network = (process.env.NEXT_PUBLIC_FLOW_NETWORK as 'emulator' | 'testnet' | 'mainnet') || 'emulator';
-        
-        configureFlow(network);
+        // Configure Flow for testnet
+        configureFlow();
         
         // Get store methods directly without subscribing
         const { connect, updatePrice, loadTargetCells } = useOverflowStore.getState();
@@ -64,5 +63,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     );
   }
   
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <ToastProvider />
+    </>
+  );
 }

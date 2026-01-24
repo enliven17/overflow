@@ -8,6 +8,7 @@ import { create } from "zustand";
 import { WalletState, createWalletSlice, restoreWalletSession } from "./walletSlice";
 import { GameState, createGameSlice, startPriceFeed } from "./gameSlice";
 import { HistoryState, createHistorySlice, restoreBetHistory } from "./historySlice";
+import { BalanceState, createBalanceSlice } from "./balanceSlice";
 import { subscribeToBetEvents } from "@/lib/flow/events";
 import { BetPlacedEvent, RoundSettledEvent } from "@/lib/flow/events";
 import { BetRecord } from "@/types/bet";
@@ -16,7 +17,7 @@ import { TargetCell } from "@/types/game";
 /**
  * Combined store type
  */
-export type OverflowStore = WalletState & GameState & HistoryState;
+export type OverflowStore = WalletState & GameState & HistoryState & BalanceState;
 
 /**
  * Create the main Zustand store
@@ -25,7 +26,8 @@ export type OverflowStore = WalletState & GameState & HistoryState;
 export const useOverflowStore = create<OverflowStore>()((...args) => ({
   ...createWalletSlice(...args),
   ...createGameSlice(...args),
-  ...createHistorySlice(...args)
+  ...createHistorySlice(...args),
+  ...createBalanceSlice(...args)
 }));
 
 /**
@@ -47,6 +49,11 @@ export const initializeStore = async (): Promise<void> => {
     
     // Load target cells from blockchain
     await store.loadTargetCells();
+    
+    // Fetch house balance if wallet is connected
+    if (store.address) {
+      await store.fetchBalance(store.address);
+    }
     
     // Set up event subscriptions
     setupEventSubscriptions();
@@ -150,6 +157,11 @@ const handleBetPlacedEvent = (event: BetPlacedEvent): void => {
     
     // Refresh wallet balance
     store.refreshBalance();
+    
+    // Refresh house balance
+    if (store.address) {
+      store.fetchBalance(store.address);
+    }
   }
 };
 
@@ -196,6 +208,11 @@ const handleRoundSettledEvent = (event: RoundSettledEvent): void => {
     
     // Refresh wallet balance
     store.refreshBalance();
+    
+    // Refresh house balance
+    if (store.address) {
+      store.fetchBalance(store.address);
+    }
   }
 };
 
@@ -224,6 +241,8 @@ export const useTargetCells = () => useOverflowStore(state => state.targetCells)
 export const useBetHistory = () => useOverflowStore(state => state.bets);
 export const useIsPlacingBet = () => useOverflowStore(state => state.isPlacingBet);
 export const useIsSettling = () => useOverflowStore(state => state.isSettling);
+export const useHouseBalance = () => useOverflowStore(state => state.houseBalance);
+export const useIsLoadingBalance = () => useOverflowStore(state => state.isLoading);
 
 /**
  * Export main store hook (alias for convenience)
@@ -232,21 +251,37 @@ export const useStore = useOverflowStore;
 
 /**
  * Export actions
+ * Note: These selectors return new objects on each call, which can cause infinite loops.
+ * Use direct store access (useOverflowStore(state => state.actionName)) instead.
  */
-export const useWalletActions = () => useOverflowStore(state => ({
-  connect: state.connect,
-  disconnect: state.disconnect,
-  refreshBalance: state.refreshBalance
-}));
+export const useWalletActions = () => {
+  const connect = useOverflowStore(state => state.connect);
+  const disconnect = useOverflowStore(state => state.disconnect);
+  const refreshBalance = useOverflowStore(state => state.refreshBalance);
+  return { connect, disconnect, refreshBalance };
+};
 
-export const useGameActions = () => useOverflowStore(state => ({
-  placeBet: state.placeBet,
-  settleRound: state.settleRound,
-  updatePrice: state.updatePrice
-}));
+export const useGameActions = () => {
+  const placeBet = useOverflowStore(state => state.placeBet);
+  const placeBetFromHouseBalance = useOverflowStore(state => state.placeBetFromHouseBalance);
+  const settleRound = useOverflowStore(state => state.settleRound);
+  const updatePrice = useOverflowStore(state => state.updatePrice);
+  return { placeBet, placeBetFromHouseBalance, settleRound, updatePrice };
+};
 
-export const useHistoryActions = () => useOverflowStore(state => ({
-  fetchHistory: state.fetchHistory,
-  addBet: state.addBet,
-  clearHistory: state.clearHistory
-}));
+export const useHistoryActions = () => {
+  const fetchHistory = useOverflowStore(state => state.fetchHistory);
+  const addBet = useOverflowStore(state => state.addBet);
+  const clearHistory = useOverflowStore(state => state.clearHistory);
+  return { fetchHistory, addBet, clearHistory };
+};
+
+export const useBalanceActions = () => {
+  const fetchBalance = useOverflowStore(state => state.fetchBalance);
+  const setBalance = useOverflowStore(state => state.setBalance);
+  const updateBalance = useOverflowStore(state => state.updateBalance);
+  const depositFunds = useOverflowStore(state => state.depositFunds);
+  const withdrawFunds = useOverflowStore(state => state.withdrawFunds);
+  const clearError = useOverflowStore(state => state.clearError);
+  return { fetchBalance, setBalance, updateBalance, depositFunds, withdrawFunds, clearError };
+};

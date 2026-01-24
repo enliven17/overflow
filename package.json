@@ -10,14 +10,20 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:db": "jest supabase/__tests__",
     "emulator": "flow emulator start --dev-wallet",
     "deploy:emulator": "flow project deploy --network=emulator",
-    "test:contracts": "flow test --cover"
+    "test:contracts": "flow test --cover",
+    "db:verify": "ts-node supabase/scripts/verify-setup.ts",
+    "db:show-migration": "ts-node supabase/scripts/show-migration.ts",
+    "check-sync": "ts-node scripts/check-balance-sync.ts",
+    "reconcile": "ts-node scripts/reconcile-balance.ts"
   },
   "dependencies": {
     "@onflow/fcl": "^1.21.9",
     "@onflow/types": "^1.5.0",
     "@pythnetwork/hermes-client": "^2.1.0",
+    "@supabase/supabase-js": "^2.91.1",
     "d3-scale": "^4.0.2",
     "d3-shape": "^3.2.0",
     "next": "16.1.3",
@@ -34,12 +40,15 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "cross-fetch": "^4.1.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.3",
     "fast-check": "^4.5.3",
     "jest": "^30.2.0",
     "jest-environment-jsdom": "^30.2.0",
+    "supabase": "^2.72.8",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
     "typescript": "^5"
   }
 }

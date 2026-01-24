@@ -3,35 +3,30 @@
  */
 
 /**
- * Transaction to place a bet
+ * Transaction to place a bet using house balance
  * @param amount - Bet amount in FLOW tokens (e.g., "1.0")
  * @param targetCellId - ID of the target cell (1-8)
  * @param multiplier - Payout multiplier (e.g., "2.0")
+ * @param priceChange - Expected price change
+ * @param direction - 0 for UP, 1 for DOWN
  * @returns Cadence transaction code
  */
 export const placeBetTransaction = (
   amount: string,
   targetCellId: string,
-  multiplier: string
+  multiplier: string,
+  priceChange: string,
+  direction: number
 ) => {
   return `
 import OverflowGame from 0xOverflowGame
-import FlowToken from 0xFlowToken
-import FungibleToken from 0xFungibleToken
 
 transaction(amount: UFix64, targetCellId: UInt8, priceChange: Fix64, direction: UInt8, multiplier: UFix64) {
-  let paymentVault: @{FungibleToken.Vault}
   let playerAddress: Address
   
   prepare(signer: auth(BorrowValue) &Account) {
     // Store player address
     self.playerAddress = signer.address
-    
-    // Withdraw FLOW tokens from signer's vault
-    let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
-      ?? panic("Could not borrow reference to FlowToken.Vault")
-    
-    self.paymentVault <- vaultRef.withdraw(amount: amount)
   }
   
   execute {
@@ -43,15 +38,15 @@ transaction(amount: UFix64, targetCellId: UInt8, priceChange: Fix64, direction: 
       timeframe: 30.0
     )
     
-    // Place bet
-    let betId = OverflowGame.placeBet(
-      payment: <-self.paymentVault,
+    // Place bet from house balance
+    let betId = OverflowGame.placeBetFromHouseBalance(
+      player: self.playerAddress,
       targetCell: targetCell,
-      multiplier: multiplier,
-      player: self.playerAddress
+      betAmount: amount,
+      multiplier: multiplier
     )
     
-    log("Bet placed successfully with ID: ".concat(betId.toString()))
+    log("Bet placed successfully from house balance with ID: ".concat(betId.toString()))
   }
 }
 `;

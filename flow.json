@@ -10,6 +10,7 @@
       "source": "",
       "aliases": {
         "emulator": "0xee82856bf20e2aa6",
+        "testnet": "0x9a0766d93b6608b7",
         "testing": "0x0000000000000002"
       }
     },
@@ -17,18 +18,21 @@
       "source": "",
       "aliases": {
         "emulator": "0x0ae53cb6e3f42a79",
+        "testnet": "0x7e60df042a9c0868",
         "testing": "0x0000000000000003"
       }
     },
     "MockPriceOracle": {
       "source": "./cadence/contracts/MockPriceOracle.cdc",
       "aliases": {
+        "testnet": "0xfc2730bbe0bd4941",
         "testing": "0x0000000000000007"
       }
     },
     "OverflowGame": {
       "source": "./cadence/contracts/OverflowGame.cdc",
       "aliases": {
+        "testnet": "0xfc2730bbe0bd4941",
         "testing": "0x0000000000000007"
       }
     }
@@ -43,11 +47,27 @@
     "emulator-account": {
       "address": "f8d6e0586b0a20c7",
       "key": "ae1b44c0f5e8f6c7e3b4c3e8f6c7e3b4c3e8f6c7e3b4c3e8f6c7e3b4c3e8f6c7"
+    },
+    "testnet-account": {
+      "address": "0xfc2730bbe0bd4941",
+      "key": {
+        "type": "hex",
+        "index": 0,
+        "signatureAlgorithm": "ECDSA_P256",
+        "hashAlgorithm": "SHA3_256",
+        "privateKey": "e1d1bde52ea1d5f8fa7d2f9a3e0811350e2129105aeb4ce8181762163473beeb"
+      }
     }
   },
   "deployments": {
     "emulator": {
       "emulator-account": [
+        "MockPriceOracle",
+        "OverflowGame"
+      ]
+    },
+    "testnet": {
+      "testnet-account": [
         "MockPriceOracle",
         "OverflowGame"
       ]

@@ -101,6 +101,34 @@ access(all) contract OverflowGame {
         timestamp: UFix64
     )
     
+    /// Event emitted when a user deposits FLOW tokens to house balance
+    access(all) event Deposit(
+        userAddress: Address,
+        amount: UFix64,
+        timestamp: UFix64
+    )
+    
+    /// Event emitted when a user withdraws FLOW tokens from house balance
+    access(all) event Withdrawal(
+        userAddress: Address,
+        amount: UFix64,
+        timestamp: UFix64
+    )
+    
+    /// Event emitted when a bet is placed from house balance
+    access(all) event HouseBetPlaced(
+        betId: UInt64,
+        userAddress: Address,
+        betAmount: UFix64,
+        targetCellId: UInt8,
+        priceChange: Fix64,
+        direction: UInt8,
+        multiplier: UFix64,
+        startPrice: UFix64,
+        startTime: UFix64,
+        endTime: UFix64
+    )
+    
     // ========================================
     // Enums
     // ========================================
@@ -512,6 +540,149 @@ access(all) contract OverflowGame {
                 betId: betId,
                 player: player,
                 amount: betAmount,
+                targetCellId: targetCell.id,
+                priceChange: targetCell.priceChange,
+                direction: targetCell.direction.rawValue,
+                multiplier: multiplier,
+                startPrice: startPrice,
+                startTime: betRef!.startTime,
+                endTime: betRef!.endTime
+            )
+        }
+        
+        // Return bet ID
+        return betId
+    }
+    
+    /// Deposit FLOW tokens to house balance
+    /// Accepts FLOW token payment and deposits it into the escrow vault
+    /// @param vault: FlowToken.Vault containing the deposit amount
+    /// @return The deposit amount
+    /// Requirement 1.1, 1.3
+    access(all) fun deposit(vault: @{FungibleToken.Vault}): UFix64 {
+        pre {
+            vault.balance > 0.0: "Deposit amount must be greater than zero"
+        }
+        
+        let amount = vault.balance
+        let userAddress = self.account.address
+        
+        // Get reference to escrow vault
+        let escrowVaultRef = self.account.storage.borrow<&FlowToken.Vault>(from: self.EscrowVaultStoragePath)
+            ?? panic("Could not borrow reference to Escrow Vault")
+        
+        // Deposit into escrow vault
+        escrowVaultRef.deposit(from: <-vault)
+        
+        // Emit Deposit event for API to update Supabase
+        emit Deposit(
+            userAddress: userAddress,
+            amount: amount,
+            timestamp: getCurrentBlock().timestamp
+        )
+        
+        return amount
+    }
+    
+    /// Withdraw FLOW tokens from house balance
+    /// Withdraws tokens from the escrow vault and returns them to the user
+    /// @param amount: Amount of FLOW tokens to withdraw
+    /// @return FungibleToken.Vault containing the withdrawn tokens
+    /// Requirement 5.2, 5.4
+    access(all) fun withdraw(amount: UFix64): @{FungibleToken.Vault} {
+        pre {
+            amount > 0.0: "Withdrawal amount must be greater than zero"
+        }
+        
+        let userAddress = self.account.address
+        
+        // Get reference to escrow vault with withdraw authorization
+        let escrowVaultRef = self.account.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: self.EscrowVaultStoragePath)
+            ?? panic("Could not borrow reference to Escrow Vault")
+        
+        // Validate sufficient escrow balance
+        if escrowVaultRef.balance < amount {
+            panic("Insufficient escrow balance for withdrawal")
+        }
+        
+        // Withdraw from escrow vault
+        let withdrawnVault <- escrowVaultRef.withdraw(amount: amount)
+        
+        // Emit Withdrawal event for API to update Supabase
+        emit Withdrawal(
+            userAddress: userAddress,
+            amount: amount,
+            timestamp: getCurrentBlock().timestamp
+        )
+        
+        return <-withdrawnVault
+    }
+    
+    /// Place a bet using house balance
+    /// Records bet without accepting payment vault (balance deduction happens in API)
+    /// @param targetCell: The target cell defining the prediction
+    /// @param betAmount: Amount of FLOW tokens being wagered
+    /// @param multiplier: Payout multiplier for this bet
+    /// @param player: Address of the player placing the bet
+    /// @return The unique bet ID
+    /// Requirement 3.4
+    access(all) fun placeBetFromHouseBalance(
+        targetCell: TargetCell,
+        betAmount: UFix64,
+        multiplier: UFix64,
+        player: Address
+    ): UInt64 {
+        pre {
+            !OverflowGame.gamePaused: "Game is currently paused. New bets cannot be placed."
+            betAmount > 0.0: "Bet amount must be greater than zero"
+            multiplier >= 1.0: "Multiplier must be at least 1.0"
+        }
+        
+        // Check if player already has an active bet
+        if self.activeBetsByPlayer.containsKey(player) {
+            let activeBetId = self.activeBetsByPlayer[player]!
+            let activeBetRef = &self.bets[activeBetId] as &Bet?
+            if activeBetRef != nil && !activeBetRef!.isSettled() {
+                panic("Player already has an active bet. Please settle the current bet before placing a new one.")
+            }
+        }
+        
+        // Query oracle for current BTC price
+        let priceData = MockPriceOracle.getFreshPrice()
+        let startPrice = priceData.price
+        
+        // Note: Balance deduction happens in API before this is called
+        // Contract just records the bet
+        
+        // Generate unique bet ID
+        let betId = self.nextBetId
+        self.nextBetId = self.nextBetId + 1
+        
+        // Create new Bet resource
+        let bet <- create Bet(
+            id: betId,
+            player: player,
+            amount: betAmount,
+            targetCell: targetCell,
+            multiplier: multiplier,
+            startPrice: startPrice
+        )
+        
+        // Store bet in contract storage
+        let oldBet <- self.bets[betId] <- bet
+        destroy oldBet
+        
+        // Track active bet for this player
+        self.activeBetsByPlayer[player] = betId
+        
+        // Get bet reference to emit event with correct data
+        let betRef = &self.bets[betId] as &Bet?
+        if betRef != nil {
+            // Emit HouseBetPlaced event
+            emit HouseBetPlaced(
+                betId: betId,
+                userAddress: player,
+                betAmount: betAmount,
                 targetCellId: targetCell.id,
                 priceChange: targetCell.priceChange,
                 direction: targetCell.direction.rawValue,

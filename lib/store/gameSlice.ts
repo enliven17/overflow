@@ -8,11 +8,44 @@ import { StateCreator } from "zustand";
 import { TargetCell, PricePoint, ActiveRound } from "@/types/game";
 import { placeBetTransaction, settleRoundTransaction } from "@/lib/flow/transactions";
 
+/**
+ * Format a number to Flow's UFix64 format (exactly 8 decimal places)
+ * @param value - Number or string to format
+ * @returns String formatted as UFix64 (e.g., "1.00000000")
+ */
+const toUFix64 = (value: string | number): string => {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return "0.00000000";
+  return num.toFixed(8);
+};
+
+/**
+ * Format a number to Flow's Fix64 format (exactly 8 decimal places, can be negative)
+ * @param value - Number or string to format
+ * @returns String formatted as Fix64 (e.g., "-5.00000000")
+ */
+const toFix64 = (value: string | number): string => {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return "0.00000000";
+  return num.toFixed(8);
+};
+
+// Active bet type for instant-resolution system
+export interface ActiveBet {
+  id: string;
+  cellId: string; // The cell this bet is placed on (e.g., "cell-1737748395000-3")
+  amount: number;
+  multiplier: number;
+  direction: 'UP' | 'DOWN';
+  timestamp: number;
+}
+
 export interface GameState {
   // State
   currentPrice: number;
   priceHistory: PricePoint[];
-  activeRound: ActiveRound | null;
+  activeRound: ActiveRound | null; // Keep for backward compatibility
+  activeBets: ActiveBet[]; // Multiple concurrent bets
   targetCells: TargetCell[];
   isPlacingBet: boolean;
   isSettling: boolean;
@@ -20,6 +53,9 @@ export interface GameState {
 
   // Actions
   placeBet: (amount: string, targetId: string) => Promise<void>;
+  placeBetFromHouseBalance: (amount: string, targetId: string, userAddress: string, cellId?: string) => Promise<{ betId: string; remainingBalance: number; bet: ActiveBet } | void>;
+  addActiveBet: (bet: ActiveBet) => void;
+  resolveBet: (betId: string, won: boolean, payout: number) => void;
   settleRound: (betId: string) => Promise<void>;
   updatePrice: (price: number) => void;
   setActiveRound: (round: ActiveRound | null) => void;
@@ -51,6 +87,7 @@ export const createGameSlice: StateCreator<GameState> = (set, get) => ({
   currentPrice: 0,
   priceHistory: [],
   activeRound: null,
+  activeBets: [], // Multiple concurrent bets
   targetCells: DEFAULT_TARGET_CELLS,
   isPlacingBet: false,
   isSettling: false,
@@ -107,19 +144,22 @@ export const createGameSlice: StateCreator<GameState> = (set, get) => ({
       // Prepare transaction arguments
       // For dynamic targets, use '9' as a special indicator
       const targetCellId = targetId.startsWith('UP-') || targetId.startsWith('DOWN-') ? '9' : target.id;
-      const priceChange = target.priceChange.toString();
-      const direction = target.direction === 'UP' ? '0' : '1';
-      const multiplier = target.multiplier.toString();
+
+      // Format values for Flow's fixed-point types (exactly 8 decimal places)
+      const formattedAmount = toUFix64(amount);
+      const formattedPriceChange = toFix64(target.priceChange);
+      const formattedMultiplier = toUFix64(target.multiplier);
+      const directionNum = target.direction === 'UP' ? 0 : 1;
 
       // Execute transaction
       const transactionId = await fcl.mutate({
-        cadence: placeBetTransaction(amount, targetCellId, multiplier),
+        cadence: placeBetTransaction(formattedAmount, targetCellId, formattedMultiplier, formattedPriceChange, directionNum),
         args: (arg: any, t: any) => [
-          arg(amount, t.UFix64),
+          arg(formattedAmount, t.UFix64),
           arg(targetCellId, t.UInt8),
-          arg(priceChange, t.Fix64),
-          arg(direction, t.UInt8),
-          arg(multiplier, t.UFix64)
+          arg(formattedPriceChange, t.Fix64),
+          arg(directionNum.toString(), t.UInt8),
+          arg(formattedMultiplier, t.UFix64)
         ],
         limit: 9999
       });
@@ -162,6 +202,121 @@ export const createGameSlice: StateCreator<GameState> = (set, get) => ({
       }
     } catch (error) {
       console.error("Error placing bet:", error);
+      set({
+        isPlacingBet: false,
+        error: error instanceof Error ? error.message : "Failed to place bet"
+      });
+      throw error;
+    }
+  },
+
+  /**
+   * Place a bet using house balance (no wallet signature required)
+   * Instant-resolution system: bet is placed on a specific cell, resolves when chart hits it
+   * @param amount - Bet amount in FLOW tokens
+   * @param targetId - Dynamic grid target (e.g., "UP-2.50") containing direction and multiplier
+   * @param userAddress - User's wallet address
+   * @param cellId - Optional: The specific cell ID this bet is placed on
+   */
+  placeBetFromHouseBalance: async (amount: string, targetId: string, userAddress: string, cellId?: string) => {
+    const { targetCells, currentPrice, addActiveBet } = get();
+
+    try {
+      // Parse amount for validation
+      const betAmount = parseFloat(amount);
+      if (isNaN(betAmount) || betAmount <= 0) {
+        throw new Error("Invalid bet amount");
+      }
+
+      // Ensure address starts with 0x
+      const formattedAddress = userAddress.startsWith('0x') ? userAddress : `0x${userAddress}`;
+
+      let target: TargetCell;
+      let direction: 'UP' | 'DOWN' = 'UP';
+      let multiplier = 1.5;
+
+      // Check if this is a dynamic grid target (e.g., "UP-2.50" or "DOWN-1.80")
+      if (targetId.startsWith('UP-') || targetId.startsWith('DOWN-')) {
+        const parts = targetId.split('-');
+        direction = parts[0] as 'UP' | 'DOWN';
+        multiplier = parseFloat(parts[1]) || 1.5;
+
+        // Create dynamic target
+        target = {
+          id: targetId,
+          label: `${direction} x${multiplier}`,
+          multiplier: multiplier,
+          priceChange: direction === 'UP' ? 10 : -10,
+          direction: direction
+        };
+      } else {
+        // Find predefined target cell
+        const foundTarget = targetCells.find(cell => cell.id === targetId);
+        if (!foundTarget) {
+          throw new Error("Invalid target cell");
+        }
+        target = foundTarget;
+        direction = target.direction;
+        multiplier = target.multiplier;
+      }
+
+      set({ isPlacingBet: true, error: null });
+
+      // Call API endpoint to place bet from house balance
+      const response = await fetch('/api/balance/bet', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userAddress: formattedAddress,
+          betAmount,
+          roundId: Date.now(),
+          targetPrice: currentPrice,
+          isOver: direction === 'UP',
+          multiplier: multiplier,
+          targetCell: {
+            id: 9, // Always use 9 for dynamic grid bets
+            priceChange: target.priceChange,
+            direction: direction,
+            timeframe: 30,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to place bet');
+      }
+
+      const data = await response.json();
+
+      // Create active bet for tracking (instant-resolution system)
+      const activeBet: ActiveBet = {
+        id: data.betId,
+        cellId: cellId || targetId,
+        amount: betAmount,
+        multiplier: multiplier,
+        direction: direction,
+        timestamp: Date.now()
+      };
+
+      // Add to active bets (multiple bets can be active simultaneously)
+      addActiveBet(activeBet);
+
+      set({
+        isPlacingBet: false,
+        error: null
+      });
+
+      // Return bet info for UI
+      return {
+        betId: data.betId,
+        remainingBalance: data.remainingBalance,
+        bet: activeBet
+      };
+    } catch (error) {
+      console.error("Error placing bet from house balance:", error);
       set({
         isPlacingBet: false,
         error: error instanceof Error ? error.message : "Failed to place bet"
@@ -300,6 +455,30 @@ export const createGameSlice: StateCreator<GameState> = (set, get) => ({
   },
 
   /**
+   * Add a new active bet (for instant-resolution system)
+   * @param bet - The bet to add
+   */
+  addActiveBet: (bet: ActiveBet) => {
+    const { activeBets } = get();
+    set({ activeBets: [...activeBets, bet] });
+  },
+
+  /**
+   * Resolve a bet (win or lose) and update house balance
+   * @param betId - The bet ID to resolve
+   * @param won - Whether the bet was won
+   * @param payout - The payout amount if won
+   */
+  resolveBet: (betId: string, won: boolean, payout: number) => {
+    const { activeBets } = get();
+    // Remove the resolved bet from active bets
+    set({ activeBets: activeBets.filter(b => b.id !== betId) });
+
+    // Log resolution for debugging
+    console.log(`Bet ${betId} resolved: ${won ? 'WON' : 'LOST'}, payout: ${payout}`);
+  },
+
+  /**
    * Clear error message
    */
   clearError: () => {
@@ -320,22 +499,22 @@ export const startPriceFeed = (
   import('@/lib/utils/priceFeed').then(({ startPythPriceFeed }) => {
     const stopFeed = startPythPriceFeed((price, data) => {
       updatePrice(price);
-      
+
       // Log price updates with confidence interval
       console.log(`BTC Price: $${price.toFixed(2)} ±$${data.confidence.toFixed(2)}`);
     });
-    
+
     // Store cleanup function
     (window as any).__stopPriceFeed = stopFeed;
   }).catch(error => {
     console.error('Failed to start Pyth price feed:', error);
-    
+
     // Fallback to mock price feed for development
     import('@/lib/utils/priceFeed').then(({ startMockPriceFeed }) => {
       const stopFeed = startMockPriceFeed((price) => {
         updatePrice(price);
       });
-      
+
       (window as any).__stopPriceFeed = stopFeed;
     });
   });

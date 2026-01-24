@@ -20,7 +20,7 @@ const orbitron = Orbitron({
 });
 
 export const metadata: Metadata = {
-  title: "Overflow - BTC Price Prediction Game",
+  title: "Overflow",
   description: "Decentralized real-time BTC price prediction game on Flow Blockchain",
 };
 

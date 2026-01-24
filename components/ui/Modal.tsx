@@ -39,23 +39,23 @@ export const Modal: React.FC<ModalProps> = ({
       />
       
       {/* Modal Content */}
-      <div className="relative bg-[#0a0a0a] border-2 border-[#FF006E] rounded-lg shadow-[0_0_30px_rgba(255,0,110,0.5)] max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div className="relative bg-black/90 border border-neon-blue/50 rounded-lg shadow-[0_0_20px_rgba(0,240,255,0.2)] max-w-xs w-full mx-4 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         {title && (
-          <div className="border-b border-gray-800 px-6 py-4">
-            <h2 className="text-xl font-bold text-[#FF006E]">{title}</h2>
+          <div className="border-b border-neon-blue/30 px-3 py-2">
+            <h2 className="text-sm font-bold text-neon-blue font-mono uppercase tracking-wider">{title}</h2>
           </div>
         )}
         
         {/* Body */}
-        <div className="px-6 py-4">
+        <div className="px-3 py-2.5">
           {children}
         </div>
         
         {/* Close Button */}
         {showCloseButton && (
-          <div className="border-t border-gray-800 px-6 py-4 flex justify-end">
-            <Button onClick={onClose} variant="secondary" size="sm">
+          <div className="border-t border-neon-blue/30 px-3 py-2 flex justify-end">
+            <Button onClick={onClose} variant="secondary" size="sm" className="!px-3 !py-1 !text-xs">
               Close
             </Button>
           </div>

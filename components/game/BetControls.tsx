@@ -18,7 +18,7 @@ export const BetControls: React.FC<BetControlsProps> = ({
   onBetAmountChange,
   onPlaceBet
 }) => {
-  const balance = useStore((state) => state.balance);
+  const houseBalance = useStore((state) => state.houseBalance);
   const isConnected = useStore((state) => state.isConnected);
   const activeRound = useStore((state) => state.activeRound);
   const targetCells = useStore((state) => state.targetCells);
@@ -59,9 +59,9 @@ export const BetControls: React.FC<BetControlsProps> = ({
       return false;
     }
 
-    const walletBalance = parseFloat(balance);
-    if (amount > walletBalance) {
-      setError(`Insufficient balance. You have ${walletBalance.toFixed(2)} FLOW`);
+    // Check house balance instead of wallet balance
+    if (amount > houseBalance) {
+      setError(`Insufficient house balance. You have ${houseBalance.toFixed(2)} FLOW. Please deposit more.`);
       return false;
     }
 
@@ -82,11 +82,11 @@ export const BetControls: React.FC<BetControlsProps> = ({
       <div className="space-y-4">
         <h3 className="text-xl font-bold text-white">Place Bet</h3>
 
-        {/* Wallet Balance */}
+        {/* House Balance */}
         {isConnected && (
           <div className="bg-gray-900 rounded p-3">
-            <p className="text-gray-400 text-xs uppercase tracking-wider">Available Balance</p>
-            <p className="text-white text-lg font-bold">{parseFloat(balance).toFixed(2)} FLOW</p>
+            <p className="text-gray-400 text-xs uppercase tracking-wider">House Balance</p>
+            <p className="text-white text-lg font-bold">{houseBalance.toFixed(2)} FLOW</p>
           </div>
         )}
 
