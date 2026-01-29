@@ -1,192 +1,387 @@
-# Overflow - BTC Price Prediction Game
+# Overflow
 
-Overflow is a decentralized real-time BTC price prediction game built on Flow Blockchain where users bet FLOW tokens on Bitcoin price movements.
+Decentralized BTC price prediction game on Flow Blockchain. Users deposit FLOW tokens into a house balance and place bets on Bitcoin price movements within 30-second rounds.
 
-## Features
+## Architecture Overview
 
-- 🎮 Real-time BTC price prediction game
-- 💰 Bet FLOW tokens on price movements
-- 📊 Live price chart visualization
-- 🎯 Multiple betting targets with different multipliers
-- ⚡ 30-second rounds with instant payouts
-- 🔒 Secure smart contract-based escrow
-- 🌐 Oracle-powered price feeds
-- 🎨 Cyberpunk-themed UI
-
-## Architecture
-
-The system consists of three main layers:
-
-1. **Smart Contract Layer (Cadence)**: Manages deposits, escrow, oracle integration, and payouts
-2. **Frontend Layer (Next.js)**: Provides the user interface with live chart and betting interface
-3. **Oracle Layer**: Supplies tamper-proof BTC price feeds
-
-## Prerequisites
-
-- Node.js 18+ and npm
-- Flow CLI ([installation guide](https://developers.flow.com/tools/flow-cli/install))
-- A Flow wallet (Blocto, Lilico, etc.) for testing
-
-## Getting Started
-
-### 1. Install Dependencies
-
-```bash
-npm install
+```mermaid
+graph TB
+    subgraph "Frontend Layer"
+        UI[Next.js UI]
+        Store[Zustand Store]
+        FCL[Flow Client Library]
+    end
+    
+    subgraph "Backend Layer"
+        API[Next.js API Routes]
+        DB[(Supabase PostgreSQL)]
+    end
+    
+    subgraph "Blockchain Layer"
+        Contract[OverflowGame Contract]
+        Oracle[Price Oracle]
+    end
+    
+    subgraph "External Services"
+        Pyth[Pyth Network]
+        Wallet[Flow Wallet]
+    end
+    
+    UI --> Store
+    Store --> FCL
+    Store --> API
+    API --> DB
+    FCL --> Contract
+    FCL --> Wallet
+    Contract --> Oracle
+    Pyth --> UI
 ```
 
-### 2. Set Up Environment Variables
+## System Components
 
-Copy the example environment file and configure it:
+### 1. House Balance System
 
-```bash
-cp .env.example .env.local
+Users deposit FLOW tokens into a house balance stored in Supabase. Bets deduct from this balance without requiring wallet signatures for each bet.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Wallet
+    participant Contract
+    participant API
+    participant DB
+    
+    User->>Wallet: Initiate Deposit
+    Wallet->>Contract: Transfer FLOW
+    Contract->>Contract: Update Balance
+    User->>API: Record Deposit
+    API->>DB: Update user_balances
+    DB-->>API: Confirm
+    API-->>User: Balance Updated
 ```
 
-Edit `.env.local` to configure your network settings.
+### 2. Betting Flow
 
-### 3. Start Flow Emulator
-
-In a separate terminal, start the Flow emulator:
-
-```bash
-# Using the provided script
-chmod +x scripts/start-emulator.sh
-./scripts/start-emulator.sh
-
-# Or directly
-flow emulator start --dev-wallet
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI
+    participant API
+    participant DB
+    
+    User->>UI: Select Target & Amount
+    UI->>API: POST /api/balance/bet
+    API->>DB: Check Balance
+    DB-->>API: Balance OK
+    API->>DB: Deduct Amount
+    API->>DB: Create Audit Log
+    DB-->>API: Success
+    API-->>UI: Bet Placed
+    UI-->>User: Show Active Round
 ```
 
-The emulator will start on `http://localhost:8888` and the dev wallet on `http://localhost:8701`.
+### 3. Settlement Flow
 
-### 4. Deploy Smart Contracts
-
-Once the emulator is running, deploy the contracts:
-
-```bash
-# Using the provided script
-chmod +x scripts/deploy-emulator.sh
-./scripts/deploy-emulator.sh
-
-# Or using Flow CLI directly
-flow project deploy --network=emulator
+```mermaid
+sequenceDiagram
+    participant Timer
+    participant Contract
+    participant Oracle
+    participant API
+    participant DB
+    
+    Timer->>Contract: 30s Elapsed
+    Contract->>Oracle: Get Price
+    Oracle-->>Contract: Current Price
+    Contract->>Contract: Calculate Result
+    alt Win
+        Contract->>API: Payout Event
+        API->>DB: Add Winnings
+    else Loss
+        Contract->>API: Loss Event
+        API->>DB: Record Loss
+    end
 ```
 
-### 5. Start the Development Server
+## Database Schema
 
-```bash
-npm run dev
+```mermaid
+erDiagram
+    user_balances ||--o{ balance_audit_log : has
+    
+    user_balances {
+        text user_address PK
+        numeric balance
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    balance_audit_log {
+        uuid id PK
+        text user_address FK
+        text operation_type
+        numeric amount
+        numeric balance_before
+        numeric balance_after
+        text transaction_hash
+        text bet_id
+        timestamp created_at
+    }
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+## Tech Stack
+
+- **Frontend**: Next.js 15, TypeScript, Tailwind CSS
+- **State Management**: Zustand
+- **Blockchain**: Flow Blockchain, Cadence
+- **Database**: Supabase (PostgreSQL)
+- **Price Feed**: Pyth Network
+- **Charts**: Recharts
 
 ## Project Structure
 
 ```
 overflow/
-├── app/                    # Next.js app directory
-│   ├── layout.tsx         # Root layout
-│   ├── page.tsx           # Main game page
-│   └── globals.css        # Global styles
-├── cadence/               # Cadence smart contracts
-│   ├── contracts/         # Contract source files
-│   ├── scripts/           # Query scripts
-│   ├── transactions/      # Transaction templates
-│   └── tests/             # Contract tests
-├── components/            # React components
-│   ├── game/             # Game-related components
-│   ├── wallet/           # Wallet components
-│   ├── history/          # Bet history components
-│   └── ui/               # Reusable UI components
-├── lib/                   # Library code
-│   ├── flow/             # Flow blockchain integration
-│   ├── store/            # State management (Zustand)
-│   └── utils/            # Utility functions
-├── types/                 # TypeScript type definitions
-├── scripts/               # Deployment and utility scripts
-├── flow.json             # Flow configuration
-└── .env.local            # Environment variables
+├── app/
+│   ├── api/balance/          # Balance management endpoints
+│   ├── layout.tsx
+│   ├── page.tsx
+│   └── providers.tsx
+├── cadence/
+│   ├── contracts/            # Smart contracts
+│   ├── transactions/         # Transaction templates
+│   ├── scripts/              # Query scripts
+│   └── tests/                # Contract tests
+├── components/
+│   ├── balance/              # Balance UI components
+│   ├── game/                 # Game UI components
+│   ├── history/              # Bet history
+│   └── ui/                   # Reusable components
+├── lib/
+│   ├── flow/                 # Flow integration
+│   ├── store/                # State management
+│   ├── supabase/             # Database client
+│   └── utils/                # Utilities
+├── supabase/
+│   └── migrations/           # Database migrations
+└── types/                    # TypeScript types
 ```
 
-## Testing
+## Setup
 
-### Run Frontend Tests
+### Prerequisites
+
+- Node.js 18+
+- Flow CLI
+- Supabase account
+
+### Installation
 
 ```bash
-npm test
+# Install dependencies
+npm install
+
+# Configure environment
+cp .env.example .env.local
 ```
 
-### Run Contract Tests
+### Environment Variables
+
+```env
+# Flow Network
+NEXT_PUBLIC_FLOW_NETWORK=testnet
+NEXT_PUBLIC_TESTNET_ACCESS_NODE=https://rest-testnet.onflow.org
+NEXT_PUBLIC_TESTNET_DISCOVERY_WALLET=https://fcl-discovery.onflow.org/testnet/authn
+NEXT_PUBLIC_TESTNET_CONTRACT_ADDRESS=0xYOUR_CONTRACT_ADDRESS
+
+# WalletConnect
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id
+
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+
+# App Config
+NEXT_PUBLIC_APP_NAME=Overflow
+NEXT_PUBLIC_ROUND_DURATION=30
+NEXT_PUBLIC_PRICE_UPDATE_INTERVAL=1000
+```
+
+### Database Setup
 
 ```bash
-flow test --cover
+# Apply migrations
+npx supabase db push
+
+# Verify setup
+npm run verify:supabase
 ```
 
-## Network Configuration
+### Contract Deployment
 
-The application supports three networks:
+```bash
+# Generate Flow account
+flow keys generate
 
-- **Emulator**: Local development (default)
-- **Testnet**: Flow testnet for testing
-- **Mainnet**: Flow mainnet for production
+# Deploy to testnet
+flow project deploy --network=testnet
+```
 
-Switch networks by updating `NEXT_PUBLIC_FLOW_NETWORK` in `.env.local`.
+### Development
+
+```bash
+npm run dev
+```
+
+## API Endpoints
+
+### Balance Management
+
+```
+GET  /api/balance/[address]     # Get user balance
+POST /api/balance/deposit        # Record deposit
+POST /api/balance/withdraw       # Record withdrawal
+POST /api/balance/bet            # Place bet
+POST /api/balance/payout         # Process payout
+```
 
 ## Smart Contracts
 
-### OverflowGame
+### OverflowGame.cdc
 
-Main game contract that handles:
-- Bet placement and escrow
-- Round management
-- Win/loss determination
+Main game contract handling:
+- Deposit/withdrawal from house balance
+- Bet placement with multipliers
+- Round settlement
 - Payout processing
 
-### MockPriceOracle
+### Key Functions
 
-Mock oracle for testing that provides BTC price feeds.
+```cadence
+// Deposit FLOW to house balance
+pub fun deposit(vault: @FlowToken.Vault): UFix64
 
-## Development Workflow
+// Withdraw FLOW from house balance
+pub fun withdraw(amount: UFix64): @FlowToken.Vault
 
-1. **Start Emulator**: Run the Flow emulator in a separate terminal
-2. **Deploy Contracts**: Deploy contracts to the emulator
-3. **Start Dev Server**: Run the Next.js development server
-4. **Connect Wallet**: Use the dev wallet to connect
-5. **Test Features**: Place bets and test the game flow
+// Place bet from house balance
+pub fun placeBetFromHouseBalance(
+    targetCell: TargetCell,
+    betAmount: UFix64,
+    multiplier: UFix64,
+    player: Address
+): UInt64
 
-## Key Technologies
+// Settle round and determine winner
+pub fun settleRound(betId: UInt64, caller: Address): SettlementResult
+```
 
-- **Next.js 14**: React framework with App Router
-- **TypeScript**: Type-safe development
-- **Tailwind CSS**: Utility-first CSS framework
-- **Flow Client Library (FCL)**: Flow blockchain integration
-- **Zustand**: State management
-- **Jest**: Testing framework
-- **Cadence**: Smart contract language
+## State Management
 
-## Environment Variables
+```mermaid
+graph LR
+    subgraph "Zustand Store"
+        WS[Wallet State]
+        BS[Balance State]
+        GS[Game State]
+        HS[History State]
+    end
+    
+    WS --> |address, balance| BS
+    BS --> |houseBalance| GS
+    GS --> |activeRound| HS
+```
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `NEXT_PUBLIC_FLOW_NETWORK` | Network to connect to | `emulator` |
-| `NEXT_PUBLIC_EMULATOR_ACCESS_NODE` | Emulator access node URL | `http://localhost:8888` |
-| `NEXT_PUBLIC_EMULATOR_CONTRACT_ADDRESS` | Contract address on emulator | `0xf8d6e0586b0a20c7` |
-| `NEXT_PUBLIC_ROUND_DURATION` | Round duration in seconds | `30` |
-| `NEXT_PUBLIC_PRICE_UPDATE_INTERVAL` | Price update interval in ms | `1000` |
-| `NEXT_PUBLIC_CHART_TIME_WINDOW` | Chart time window in ms | `300000` |
+### Store Slices
 
-## Contributing
+- **walletSlice**: Wallet connection, address, FLOW balance
+- **balanceSlice**: House balance, deposit/withdraw operations
+- **gameSlice**: Active rounds, betting, price updates
+- **historySlice**: Bet history, past rounds
 
-This project follows a task-based implementation plan. See `.kiro/specs/overflow/tasks.md` for the detailed implementation roadmap.
+## Testing
 
-## License
+```bash
+# Frontend tests
+npm test
 
-MIT
+# Contract tests
+flow test --cover
+
+# E2E tests
+npm run test:e2e
+```
+
+## Deployment
+
+### Testnet Deployment
+
+```bash
+# Deploy contracts
+flow project deploy --network=testnet
+
+# Build frontend
+npm run build
+
+# Deploy to Vercel
+vercel deploy
+```
+
+### Production Checklist
+
+- [ ] Deploy contracts to mainnet
+- [ ] Configure production Supabase
+- [ ] Set up monitoring
+- [ ] Enable rate limiting
+- [ ] Configure CDN
+- [ ] Set up error tracking
+
+## Security Considerations
+
+1. **Balance Reconciliation**: Periodic sync between blockchain and database
+2. **Atomic Operations**: Database transactions for balance updates
+3. **Audit Logging**: All balance changes logged with transaction hashes
+4. **Input Validation**: Server-side validation for all API requests
+5. **Rate Limiting**: Prevent abuse of betting endpoints
+
+## Performance Optimizations
+
+- Real-time price updates via Pyth Network
+- Optimistic UI updates for better UX
+- Database indexes on user_address and created_at
+- Connection pooling for Supabase
+- Memoized React components
+
+## Troubleshooting
+
+### Balance Not Updating
+
+```bash
+# Check balance sync
+npm run check:balance-sync
+
+# Reconcile balance
+npm run reconcile:balance
+```
+
+### Contract Deployment Issues
+
+```bash
+# Verify Flow CLI installation
+flow version
+
+# Check account configuration
+flow accounts get 0xYOUR_ADDRESS --network=testnet
+```
 
 ## Resources
 
 - [Flow Documentation](https://developers.flow.com/)
-- [Cadence Language Reference](https://developers.flow.com/build/smart-contracts/cadence)
+- [Cadence Language](https://developers.flow.com/build/smart-contracts/cadence)
 - [FCL Documentation](https://developers.flow.com/tools/clients/fcl-js)
-- [Next.js Documentation](https://nextjs.org/docs)
+- [Supabase Documentation](https://supabase.com/docs)
+- [Pyth Network](https://pyth.network/)
+
+## License
+
+MIT
